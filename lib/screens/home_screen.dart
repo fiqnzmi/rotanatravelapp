@@ -34,12 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final user = await AuthService.instance.currentUser();
       final bookings = await _safeBookings();
+      if (!mounted) return;
       setState(() {
         _userName = user?['name'] as String?;
         _bookings = bookings;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
@@ -79,7 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-          color: const Color(0xFFE9EDF2), borderRadius: BorderRadius.circular(20)),
+        color: const Color(0xFFE9EDF2),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 16),
         const SizedBox(width: 6),
@@ -88,10 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _quickAction(
-      {required IconData icon,
-      required String label,
-      required VoidCallback onTap}) {
+  Widget _quickAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -100,7 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-              color: const Color(0xFFE9EDF2), borderRadius: BorderRadius.circular(16)),
+            color: const Color(0xFFE9EDF2),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Icon(icon, size: 28),
         ),
         const SizedBox(height: 8),
@@ -147,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.notifications_outlined),
                         ),
                         const SizedBox(width: 4),
-                        // <-- ACCOUNT SHORTCUT BUTTON -->
+                        // Account shortcut
                         IconButton(
                           tooltip: 'Account',
                           icon: const Icon(Icons.account_circle_outlined),
@@ -159,7 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const ProfileScreen()),
+                                  builder: (_) => const ProfileScreen(),
+                                ),
                               );
                             } else {
                               _showAuthShortcutSheet(context);
@@ -182,72 +190,79 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       padding: const EdgeInsets.all(18),
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Sacred Journey Awaits',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            Text('Experience the spiritual journey of a lifetime',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(color: Colors.black54)),
-                            const SizedBox(height: 18),
-                            Container(
-                              decoration: BoxDecoration(
-                                  color: const Color(0xFFF5F7FA),
-                                  borderRadius: BorderRadius.circular(16)),
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(children: [
-                                      Text('Next Trip',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                                  fontWeight: FontWeight.w700)),
-                                      const Spacer(),
-                                      if (_daysToGo != null)
-                                        Text(_daysToGo!,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                    color: Colors.black54)),
-                                    ]),
-                                    const SizedBox(height: 8),
-                                    Text(nextTrip?.title ?? '—',
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Sacred Journey Awaits',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 6),
+                          Text('Experience the spiritual journey of a lifetime',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Colors.black54)),
+                          const SizedBox(height: 18),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F7FA),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Text('Next Trip',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w700)),
+                                  const Spacer(),
+                                  if (_daysToGo != null)
+                                    Text(_daysToGo!,
                                         style: Theme.of(context)
                                             .textTheme
-                                            .bodyLarge
+                                            .bodyMedium
                                             ?.copyWith(
-                                                fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 12),
-                                    Wrap(spacing: 10, runSpacing: 8, children: [
-                                      _statusChip(
-                                          Icons.verified_outlined, 'Paid'),
-                                      _statusChip(
-                                          Icons.insert_drive_file_outlined,
-                                          'Docs Missing'),
-                                      _statusChip(
-                                          Icons
-                                              .account_balance_wallet_outlined,
-                                          'Balance Due'),
-                                    ]),
-                                    const SizedBox(height: 12),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: LinearProgressIndicator(
-                                          value: _progress, minHeight: 10),
-                                    ),
-                                  ]),
+                                                color: Colors.black54)),
+                                ]),
+                                const SizedBox(height: 8),
+                                Text(
+                                  nextTrip?.title ?? '—',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 8,
+                                  children: [
+                                    _statusChip(Icons.verified_outlined, 'Paid'),
+                                    _statusChip(Icons.insert_drive_file_outlined,
+                                        'Docs Missing'),
+                                    _statusChip(
+                                        Icons.account_balance_wallet_outlined,
+                                        'Balance Due'),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: LinearProgressIndicator(
+                                    value: _progress,
+                                    minHeight: 10,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ]),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 18),
                     Text('Quick Actions',
@@ -257,38 +272,46 @@ class _HomeScreenState extends State<HomeScreen> {
                             ?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 12),
                     Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _quickAction(
-                              icon: Icons.cloud_upload_outlined,
-                              label: 'Upload Documents',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Open a booking → Documents')));
-                              }),
-                          _quickAction(
-                              icon: Icons.payments_outlined,
-                              label: 'Pay Balance',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text('Open a booking → Payments')));
-                              }),
-                          _quickAction(
-                              icon: Icons.flight_takeoff_outlined,
-                              label: 'My Trips',
-                              onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => const TripsScreen()))),
-                          _quickAction(
-                              icon: Icons.headset_mic_outlined,
-                              label: 'Support',
-                              onTap: _openWhatsApp),
-                        ]),
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _quickAction(
+                          icon: Icons.cloud_upload_outlined,
+                          label: 'Upload Documents',
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Open a booking → Documents')),
+                            );
+                          },
+                        ),
+                        _quickAction(
+                          icon: Icons.payments_outlined,
+                          label: 'Pay Balance',
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Open a booking → Payments')),
+                            );
+                          },
+                        ),
+                        _quickAction(
+                          icon: Icons.flight_takeoff_outlined,
+                          label: 'My Trips',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TripsScreen(),
+                            ),
+                          ),
+                        ),
+                        _quickAction(
+                          icon: Icons.headset_mic_outlined,
+                          label: 'Support',
+                          onTap: _openWhatsApp,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 22),
                     Row(children: [
                       Text('Special Offers',
@@ -297,28 +320,37 @@ class _HomeScreenState extends State<HomeScreen> {
                               .titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700)),
                       const Spacer(),
-                      TextButton(onPressed: () {}, child: const Text('View All')),
+                      TextButton(
+                          onPressed: () {}, child: const Text('View All')),
                     ]),
                     const SizedBox(height: 8),
-                    _offerCard(context,
-                        title: 'Umrah Package Promo',
-                        subtitle: 'Early Bird — save up to RM 2,000',
-                        price: 4990,
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const PackageDetailScreen(packageId: 1)))),
+                    _offerCard(
+                      context,
+                      title: 'Umrah Package Promo',
+                      subtitle: 'Early Bird — save up to RM 2,000',
+                      price: 4990,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const PackageDetailScreen(packageId: 1),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    _offerCard(context,
-                        title: 'Hajj Premium',
-                        subtitle: 'Limited seats — new season',
-                        price: 22990,
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const PackageDetailScreen(packageId: 1)))),
+                    _offerCard(
+                      context,
+                      title: 'Hajj Premium',
+                      subtitle: 'Limited seats — new season',
+                      price: 22990,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const PackageDetailScreen(packageId: 1),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -341,11 +373,13 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Icon(Icons.account_circle_outlined, size: 40),
               const SizedBox(height: 8),
-              Text('Welcome to Rotana',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                'Welcome to Rotana',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 4),
               Text(
                 'Log in to manage trips, payments and documents.',
@@ -389,7 +423,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const SignupScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const SignupScreen(),
+                      ),
                     );
                   },
                 ),
@@ -407,11 +443,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _offerCard(BuildContext context,
-      {required String title,
-      required String subtitle,
-      required num price,
-      required VoidCallback onTap}) {
+  Widget _offerCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required num price,
+    required VoidCallback onTap,
+  }) {
     final formatter =
         NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 0);
     return InkWell(
@@ -435,8 +473,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: const BoxDecoration(
                     color: Color(0xFFE9EDF2),
                     borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        bottomLeft: Radius.circular(18)),
+                      topLeft: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                    ),
                   ),
                   child: const Icon(Icons.landscape_outlined, size: 40),
                 ),
@@ -446,26 +485,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 4),
-                        Text(subtitle,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: Colors.black54)),
-                        const Spacer(),
-                        Text('From ${formatter.format(price)}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                      ]),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text(subtitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Colors.black54)),
+                      const Spacer(),
+                      Text('From ${formatter.format(price)}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
               ),
             ],
