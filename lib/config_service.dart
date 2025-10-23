@@ -18,7 +18,7 @@ class ConfigService {
       'Hi Rotana, I need help with my booking.';
 
   // Toyyibpay configuration
-  static const bool toyyibpayUseSandbox = true;
+  static const bool toyyibpayUseSandbox = false;
   static const String toyyibpayCategoryCode = '1pqcbh5e';
   static const String _toyyibpaySecretKeyDefault =
       '6snobie9-a2hm-vdpp-9xa3-wv69aioimh6d';
