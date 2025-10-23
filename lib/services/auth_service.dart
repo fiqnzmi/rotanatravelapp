@@ -14,6 +14,35 @@ class AuthService {
 
   Uri _u(String path) => Uri.parse('${ConfigService.apiBase}/$path');
 
+  Map<String, dynamic> _decodeResponse(http.Response res) {
+    final body = res.body.trim();
+    if (body.isEmpty) {
+      throw Exception('Empty response from server (status: ${res.statusCode})');
+    }
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      throw Exception('Unexpected response type from server');
+    } on FormatException {
+      throw Exception('Invalid response from server: $body');
+    }
+  }
+
+  String _resolveDisplayName(
+    Map<String, dynamic> user, {
+    String fallback = '',
+  }) {
+    String pick(dynamic value) => value is String ? value.trim() : (value ?? '').toString().trim();
+    final name = pick(user['name']);
+    if (name.isNotEmpty) return name;
+    final username = pick(user['username']);
+    if (username.isNotEmpty) return username;
+    final email = pick(user['email']);
+    if (email.isNotEmpty) return email;
+    final trimmedFallback = fallback.trim();
+    return trimmedFallback.isNotEmpty ? trimmedFallback : '';
+  }
+
   Future<bool> isLoggedIn() async {
     final sp = await SharedPreferences.getInstance();
     return sp.containsKey(_keyUserId);
@@ -50,14 +79,23 @@ class AuthService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'email': email, 'password': password}),
     );
-    final m = jsonDecode(res.body);
+    final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
       final u = m['data']['user'];
       final sp = await SharedPreferences.getInstance();
       await sp.setInt(_keyUserId, u['id']);
-      await sp.setString(_keyName, u['name'] ?? username);
-      await sp.setString(_keyUsername, u['username'] ?? username);
-      await sp.setString(_keyEmail, u['email'] ?? email);
+      await sp.setString(
+        _keyName,
+        _resolveDisplayName(u, fallback: username),
+      );
+      await sp.setString(
+        _keyUsername,
+        (u['username'] as String?)?.trim().isNotEmpty == true ? u['username'].toString().trim() : username,
+      );
+      await sp.setString(
+        _keyEmail,
+        (u['email'] as String?)?.trim().isNotEmpty == true ? u['email'].toString().trim() : email,
+      );
       return;
     }
     throw Exception(m['error'] ?? 'Registration failed');
@@ -69,14 +107,26 @@ class AuthService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'identifier': identifier, 'password': password}),
     );
-    final m = jsonDecode(res.body);
+    final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
       final u = m['data']['user'];
       final sp = await SharedPreferences.getInstance();
+      final existingName = sp.getString(_keyName) ?? '';
       await sp.setInt(_keyUserId, u['id']);
-      await sp.setString(_keyName, u['name'] ?? '');
-      await sp.setString(_keyUsername, u['username'] ?? '');
-      await sp.setString(_keyEmail, u['email'] ?? '');
+      await sp.setString(
+        _keyName,
+        _resolveDisplayName(u, fallback: existingName),
+      );
+      final username = (u['username'] as String?)?.trim() ?? '';
+      final email = (u['email'] as String?)?.trim() ?? '';
+      await sp.setString(
+        _keyUsername,
+        username.isNotEmpty ? username : sp.getString(_keyUsername) ?? '',
+      );
+      await sp.setString(
+        _keyEmail,
+        email.isNotEmpty ? email : sp.getString(_keyEmail) ?? '',
+      );
       return;
     }
     throw Exception(m['error'] ?? 'Login failed');
@@ -89,7 +139,7 @@ class AuthService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'identifier': identifier}),
     );
-    final m = jsonDecode(res.body);
+    final m = _decodeResponse(res);
     if (m['success'] == true) return Map<String, dynamic>.from(m['data']);
     throw Exception(m['error'] ?? 'Failed to request reset');
   }
@@ -104,7 +154,7 @@ class AuthService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': token, 'code': code, 'new_password': newPassword}),
     );
-    final m = jsonDecode(res.body);
+    final m = _decodeResponse(res);
     if (m['success'] != true) throw Exception(m['error'] ?? 'Failed to reset password');
   }
 }
