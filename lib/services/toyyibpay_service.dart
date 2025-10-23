@@ -9,7 +9,7 @@ class ToyyibpayService {
   final http.Client _client;
 
   Uri get _createBillUri =>
-      Uri.parse('${ConfigService.toyyibpayBaseUrl}/index.php/api/createBill');
+      Uri.https(ConfigService.toyyibpayHost, '/index.php/api/createBill');
 
   Future<Uri> createBill({
     required double amount,

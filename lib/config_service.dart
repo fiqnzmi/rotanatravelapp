@@ -13,9 +13,9 @@ class ConfigService {
   }
 
   // WhatsApp Support
-  static const String whatsappNumber = '+60123456789';
+  static const String whatsappNumber = '+601137136259';
   static const String whatsappMessage =
-      'Hi Rotana, I need help with my booking.';
+      'Hi Admin, I need Support team.';
 
   // Toyyibpay configuration
   static const bool toyyibpayUseSandbox = false;
@@ -26,8 +26,12 @@ class ConfigService {
         'TOYYIBPAY_SECRET',
         defaultValue: _toyyibpaySecretKeyDefault,
       );
-  static String get toyyibpayBaseUrl =>
-      toyyibpayUseSandbox ? 'https://dev.toyyibpay.com' : 'https://toyyibpay.com';
+  static String get toyyibpayHost => const String.fromEnvironment(
+        'TOYYIBPAY_HOST',
+        defaultValue:
+            toyyibpayUseSandbox ? 'dev.toyyibpay.com' : 'www.toyyibpay.com',
+      );
+  static String get toyyibpayBaseUrl => 'https://$toyyibpayHost';
   static String get toyyibpayReturnUrl => const String.fromEnvironment(
         'TOYYIBPAY_RETURN_URL',
         defaultValue: 'https://example.com/payment-return',
