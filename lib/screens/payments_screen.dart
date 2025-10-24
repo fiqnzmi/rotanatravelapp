@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../config_service.dart';
 import '../services/payment_service.dart';
 import '../services/toyyibpay_service.dart';
 import '../services/auth_service.dart';
+import 'payment_confirmation_screen.dart';
+import 'toyyibpay_checkout_screen.dart';
 
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({super.key, required this.bookingId});
@@ -34,7 +36,10 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _svc.summary(widget.bookingId));
+    if (!mounted) return;
+    setState(() {
+      _future = _svc.summary(widget.bookingId);
+    });
   }
 
   Future<void> _addPayment() async {
@@ -68,7 +73,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     }
     if (_gatewayLoading) return;
 
-    setState(() => _gatewayLoading = true);
+    if (mounted) setState(() => _gatewayLoading = true);
     try {
       final user = await _auth.currentUser() ?? const <String, dynamic>{};
       final name = (user['name'] as String?)?.trim();
@@ -93,21 +98,34 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         description: description,
       );
 
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) {
-        throw Exception('Unable to open Toyyibpay link.');
-      }
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Toyyibpay opened. Complete payment, then refresh this page.'),
+      final resultUri = await Navigator.of(context).push<Uri?>(
+        MaterialPageRoute(
+          builder: (_) => ToyyibpayCheckoutScreen(
+            paymentUrl: uri,
+            returnUrl: ConfigService.toyyibpayReturnUrl,
+            title: 'Toyyibpay',
+          ),
         ),
       );
+
+      if (!mounted) return;
+      if (resultUri == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Toyyibpay window closed.')),
+        );
+      } else {
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => PaymentConfirmationScreen(
+              resultUri: resultUri,
+              amount: amountDue,
+              bookingId: widget.bookingId,
+            ),
+          ),
+        );
+        await _refresh();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -152,7 +170,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         title: const Text('Payments'),
         actions: [
           IconButton(
-            onPressed: () => _refresh(),
+            onPressed: () {
+              _refresh();
+            },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
           ),

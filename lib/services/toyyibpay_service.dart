@@ -48,10 +48,9 @@ class ToyyibpayService {
         'billExternalReferenceNo': reference,
     };
 
-    final res = await _client.post(
+    final res = await _postWithRedirect(
       _createBillUri,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: body,
+      body,
     );
 
     if (res.statusCode != 200) {
@@ -83,6 +82,30 @@ class ToyyibpayService {
       }
     }
     throw Exception('Failed to create Toyyibpay bill: ${res.body}');
+  }
+
+  Future<http.Response> _postWithRedirect(
+    Uri uri,
+    Map<String, String> body, {
+    int depth = 0,
+  }) async {
+    if (depth > 3) {
+      throw Exception('Toyyibpay error: too many redirects');
+    }
+    final res = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body,
+    );
+    if (res.isRedirect || res.statusCode == 308) {
+      final location = res.headers['location'];
+      if (location == null || location.isEmpty) return res;
+      final nextUri = Uri.parse(location).isAbsolute
+          ? Uri.parse(location)
+          : uri.resolve(location);
+      return _postWithRedirect(nextUri, body, depth: depth + 1);
+    }
+    return res;
   }
 
   String _normalisePhone(String? phone) {

@@ -26,8 +26,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<Map<String, dynamic>> _load() async {
     final uid = await AuthService.instance.getUserId() ?? 0;
     final summary = await _svc.bookingSummary(widget.bookingId, uid);
-    final docs = await _svc.listDocuments(widget.bookingId, uid);
-    return {'summary': summary, 'docs': docs};
+    List<Map<String, dynamic>> docs = const [];
+    String? docsError;
+    try {
+      docs = await _svc.listDocuments(widget.bookingId, uid);
+    } catch (e) {
+      docsError = e.toString();
+    }
+    return {'summary': summary, 'docs': docs, 'docsError': docsError};
   }
 
   Color _statusColor(String s) {
@@ -72,6 +78,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           final summary = m['summary'] as Map<String, dynamic>;
           final steps = (summary['steps'] as List).cast<Map<String, dynamic>>();
           final docs = (m['docs'] as List).cast<Map<String, dynamic>>();
+          final docsError = m['docsError'] as String?;
           final done = steps.where((s)=>s['done']==true).length;
 
           return ListView(
@@ -97,6 +104,30 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               const SizedBox(height: 16),
               const Text('Required Documents', style: TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
+              if (docsError != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDED),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDB4C4C)),
+                  ),
+                  child: Text(
+                    'Unable to load documents from server. Please try again later.\n$docsError',
+                    style: const TextStyle(color: Color(0xFF8B1E1E)),
+                  ),
+                ),
+              if (docs.isEmpty && docsError == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'No documents available yet.',
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ),
+                ),
               ...docs.map((d){
                 final color = _statusColor(d['status'] ?? 'REQUIRED');
                 return Card(

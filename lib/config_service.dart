@@ -29,7 +29,7 @@ class ConfigService {
   static String get toyyibpayHost => const String.fromEnvironment(
         'TOYYIBPAY_HOST',
         defaultValue:
-            toyyibpayUseSandbox ? 'dev.toyyibpay.com' : 'www.toyyibpay.com',
+            toyyibpayUseSandbox ? 'dev.toyyibpay.com' : 'toyyibpay.com',
       );
   static String get toyyibpayBaseUrl => 'https://$toyyibpayHost';
   static String get toyyibpayReturnUrl => const String.fromEnvironment(
