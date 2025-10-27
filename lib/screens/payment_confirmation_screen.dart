@@ -6,11 +6,15 @@ class PaymentConfirmationScreen extends StatelessWidget {
     required this.resultUri,
     required this.amount,
     required this.bookingId,
+    this.recordedInSystem = false,
+    this.recordError,
   });
 
   final Uri resultUri;
   final double amount;
   final int bookingId;
+  final bool recordedInSystem;
+  final String? recordError;
 
   bool get _isSuccess => resultUri.queryParameters['status_id'] == '1';
 
@@ -53,6 +57,9 @@ class PaymentConfirmationScreen extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 32),
+            if (_isSuccess)
+              _recordingStatus(),
+            if (_isSuccess) const SizedBox(height: 24),
             _infoTile('Booking ID', '#$bookingId'),
             _infoTile('Amount', 'RM ${amount.toStringAsFixed(2)}'),
             _infoTile('Toyyibpay Bill', billCode),
@@ -70,6 +77,54 @@ class PaymentConfirmationScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _recordingStatus() {
+    if (recordedInSystem) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F5E9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Payment recorded in Rotana system.',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (recordError != null && recordError!.isNotEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline, color: Colors.redAccent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Payment succeeded at Toyyibpay but could not be saved automatically.\n$recordError',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _infoTile(String label, String value) {

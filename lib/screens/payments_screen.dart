@@ -25,8 +25,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 2);
 
   late Future<Map<String, dynamic>> _future;
-  final TextEditingController amountC = TextEditingController();
-  final TextEditingController notesC = TextEditingController();
   bool _gatewayLoading = false;
 
   @override
@@ -40,25 +38,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     setState(() {
       _future = _svc.summary(widget.bookingId);
     });
-  }
-
-  Future<void> _addPayment() async {
-    final amt = double.tryParse(amountC.text) ?? 0;
-    if (amt <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
-      );
-      return;
-    }
-    await _svc.create(
-      bookingId: widget.bookingId,
-      amount: amt,
-      notes: notesC.text,
-    );
-    if (!mounted) return;
-    await _refresh();
-    amountC.clear();
-    notesC.clear();
   }
 
   Future<void> _payWithToyyibpay(
@@ -88,11 +67,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           (summary['package_title'] as String?)?.trim().isNotEmpty == true
               ? summary['package_title'] as String
               : 'Rotana Travel Booking';
-      final phone = _pickPhone(summary, user);
-      final uri = await _gateway.createBill(
-        amount: amountDue,
-        customerName: name,
-        customerEmail: email,
+        final phone = _pickPhone(summary, user);
+        final uri = await _gateway.createBill(
+          amount: amountDue,
+          customerName: name,
+          customerEmail: email,
         customerPhone: phone,
         reference: 'BOOK-${widget.bookingId}',
         description: description,
@@ -106,35 +85,72 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             returnUrl: ConfigService.toyyibpayReturnUrl,
             title: 'Toyyibpay',
           ),
-        ),
-      );
-
-      if (!mounted) return;
-      if (resultUri == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Toyyibpay window closed.')),
+          ),
         );
-      } else {
+
+        if (!mounted) return;
+        if (resultUri == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Toyyibpay window closed.')),
+          );
+          return;
+        }
+
+        bool recorded = false;
+        String? recordError;
+        if (resultUri.queryParameters['status_id'] == '1') {
+          final billCode = resultUri.queryParameters['billcode'] ?? '';
+          final transactionId =
+              resultUri.queryParameters['transaction_id'] ?? '';
+          try {
+            final paymentId = await _svc.create(
+              bookingId: widget.bookingId,
+              amount: amountDue,
+              method: 'FPX',
+              notes: billCode.isNotEmpty
+                  ? 'Toyyibpay bill $billCode'
+                  : 'Toyyibpay payment',
+            );
+            await _svc.markPaid(
+              paymentId,
+              txRef: transactionId.isNotEmpty ? transactionId : billCode,
+            );
+            recorded = true;
+          } catch (e) {
+            recordError = e.toString();
+          }
+        }
+
         await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => PaymentConfirmationScreen(
               resultUri: resultUri,
               amount: amountDue,
               bookingId: widget.bookingId,
+              recordedInSystem: recorded,
+              recordError: recordError,
             ),
           ),
         );
         await _refresh();
+        if (!recorded && recordError != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Payment succeeded but was not saved automatically: $recordError',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      } finally {
+        if (mounted) setState(() => _gatewayLoading = false);
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
-    } finally {
-      if (mounted) setState(() => _gatewayLoading = false);
     }
-  }
 
   String? _pickPhone(Map<String, dynamic> summary, Map<String, dynamic> user) {
     final candidates = <String?>[
@@ -154,13 +170,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       }
     }
     return null;
-  }
-
-  @override
-  void dispose() {
-    amountC.dispose();
-    notesC.dispose();
-    super.dispose();
   }
 
   @override
@@ -268,37 +277,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 20),
-              const Text(
-                'Add Payment (Manual Transfer)',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: amountC,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Amount (MYR)',
-                  filled: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: notesC,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  filled: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  onPressed: _addPayment,
-                  child: const Text('Record Payment'),
-                ),
-              ),
             ],
           );
         },
