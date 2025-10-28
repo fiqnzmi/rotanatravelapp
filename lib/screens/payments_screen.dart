@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../config_service.dart';
+import '../utils/json_utils.dart';
 import '../services/payment_service.dart';
 import '../services/toyyibpay_service.dart';
 import '../services/auth_service.dart';
@@ -198,11 +199,13 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           }
 
           final data = snapshot.data ?? const <String, dynamic>{};
-          final items =
-              (data['items'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-          final total = (data['total'] as num?)?.toDouble() ?? 0;
-          final paid = (data['paid'] as num?)?.toDouble() ?? 0;
-          final balance = (data['balance'] as num?)?.toDouble() ?? 0;
+          final items = (data['items'] as List? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          final total = readDouble(data['total']);
+          final paid = readDouble(data['paid']);
+          final balance = readDouble(data['balance']);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -266,17 +269,22 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   ),
                 )
               else
-                ...items.map(
-                  (p) => Card(
+                ...items.map((p) {
+                  final method = p['method']?.toString() ?? 'Payment';
+                  final status = p['status']?.toString() ?? '';
+                  final notes = p['notes']?.toString() ?? '';
+                  final amount = readDouble(p['amount']);
+                  final title = status.isNotEmpty ? '$method - $status' : method;
+                  return Card(
                     child: ListTile(
-                      title: Text('${p['method']} • ${p['status']}'),
-                      subtitle: Text(p['notes'] ?? ''),
+                      title: Text(title),
+                      subtitle: Text(notes),
                       trailing: Text(
-                        money.format((p['amount'] as num?)?.toDouble() ?? 0),
+                        money.format(amount),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
             ],
           );
         },

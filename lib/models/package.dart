@@ -1,4 +1,5 @@
 import '../config_service.dart';
+import '../utils/json_utils.dart';
 
 class TravelPackage {
   final int id;
@@ -27,42 +28,17 @@ class TravelPackage {
   });
 
   factory TravelPackage.fromJson(Map<String, dynamic> j) => TravelPackage(
-        id: _readInt(j['id']),
+        id: readInt(j['id']),
         title: j['title']?.toString() ?? '',
         description: j['description']?.toString() ?? '',
-        price: _readDouble(j['price']),
+        price: readDouble(j['price']),
         images: _resolveImages(j['images']),
-        durationDays: _readIntOrNull(j['duration_days']),
+        durationDays: readIntOrNull(j['duration_days']),
         cities: j['cities']?.toString(),
-        hotelStars: _readIntOrNull(j['hotel_stars']),
-        ratingAvg: _readDoubleOrNull(j['rating_avg']),
+        hotelStars: readIntOrNull(j['hotel_stars']),
+        ratingAvg: readDoubleOrNull(j['rating_avg']),
         coverImage: _resolveCover(j['cover_image'], j['images']),
       );
-}
-
-int _readInt(dynamic value, {int defaultValue = 0}) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? defaultValue;
-  return defaultValue;
-}
-
-int? _readIntOrNull(dynamic value) {
-  if (value == null) return null;
-  return _readInt(value);
-}
-
-double _readDouble(dynamic value, {double defaultValue = 0}) {
-  if (value is double) return value;
-  if (value is int) return value.toDouble();
-  if (value is num) return value.toDouble();
-  if (value is String) return double.tryParse(value) ?? defaultValue;
-  return defaultValue;
-}
-
-double? _readDoubleOrNull(dynamic value) {
-  if (value == null) return null;
-  return _readDouble(value);
 }
 
 List<String> _readStringList(dynamic value) {

@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
-  /// Optional callback selepas pendaftaran berjaya.
   final VoidCallback? onAuthSuccess;
 
   const SignupScreen({super.key, this.onAuthSuccess});
@@ -16,13 +15,20 @@ class _SignupScreenState extends State<SignupScreen> {
   final emailC = TextEditingController();
   final passC = TextEditingController();
   final pass2C = TextEditingController();
-  bool obscure1 = true, obscure2 = true;
+  bool obscure1 = true;
+  bool obscure2 = true;
   bool agree = true;
   bool loading = false;
 
   Future<void> _submit() async {
-    if (!agree) { _toast('Please agree to the Terms & Privacy Policy'); return; }
-    if (passC.text != pass2C.text) { _toast('Passwords do not match'); return; }
+    if (!agree) {
+      _toast('Please agree to the Terms & Privacy Policy');
+      return;
+    }
+    if (passC.text != pass2C.text) {
+      _toast('Passwords do not match');
+      return;
+    }
 
     setState(() => loading = true);
     try {
@@ -34,11 +40,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (!mounted) return;
 
-      // Jika ada callback → panggil, jika tidak → tutup skrin sign up
-      if (widget.onAuthSuccess != null) {
-        widget.onAuthSuccess!.call();
-      } else {
-        Navigator.pop(context);
+      widget.onAuthSuccess?.call();
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (!mounted) return;
@@ -48,8 +52,9 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  void _toast(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,53 +71,68 @@ class _SignupScreenState extends State<SignupScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 8))
+                BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 8)),
               ],
             ),
             child: AspectRatio(
-              aspectRatio: 16/5,
+              aspectRatio: 16 / 5,
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: Image.asset('assets/images/rotana_logo.png'),
               ),
             ),
           ),
-          Center(child: Column(children: [
-            Text('Rotana Travel & Tours',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text('Create an Account',
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54)),
-          ])),
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  'Rotana Travel & Tours',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Create an Account',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 18),
-
           _roundedField(controller: usernameC, label: 'Username'),
           const SizedBox(height: 12),
-          _roundedField(controller: emailC, label: 'Email Address', keyboard: TextInputType.emailAddress),
+          _roundedField(
+            controller: emailC,
+            label: 'Email Address',
+            keyboard: TextInputType.emailAddress,
+          ),
           const SizedBox(height: 12),
           _roundedField(
-            controller: passC, label: 'Password', obscure: obscure1,
+            controller: passC,
+            label: 'Password',
+            obscure: obscure1,
             suffix: IconButton(
-              onPressed: ()=>setState(()=>obscure1=!obscure1),
-              icon: Icon(obscure1?Icons.visibility:Icons.visibility_off),
+              onPressed: () => setState(() => obscure1 = !obscure1),
+              icon: Icon(obscure1 ? Icons.visibility : Icons.visibility_off),
             ),
           ),
           const SizedBox(height: 12),
           _roundedField(
-            controller: pass2C, label: 'Confirm Password', obscure: obscure2,
+            controller: pass2C,
+            label: 'Confirm Password',
+            obscure: obscure2,
             suffix: IconButton(
-              onPressed: ()=>setState(()=>obscure2=!obscure2),
-              icon: Icon(obscure2?Icons.visibility:Icons.visibility_off),
+              onPressed: () => setState(() => obscure2 = !obscure2),
+              icon: Icon(obscure2 ? Icons.visibility : Icons.visibility_off),
             ),
           ),
           const SizedBox(height: 10),
-
-          Row(children: [
-            Checkbox(value: agree, onChanged: (v)=>setState(()=>agree=v??false)),
-            const Expanded(child: Text('I agree to the Terms & Privacy Policy')),
-          ]),
+          Row(
+            children: [
+              Checkbox(value: agree, onChanged: (v) => setState(() => agree = v ?? false)),
+              const Expanded(child: Text('I agree to the Terms & Privacy Policy')),
+            ],
+          ),
           const SizedBox(height: 12),
-
           SizedBox(
             height: 52,
             child: FilledButton(
@@ -121,14 +141,13 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Text(loading ? 'Please wait...' : 'Create Account'),
             ),
           ),
-
           const SizedBox(height: 18),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text('Already have an account?  '),
               TextButton(
-                onPressed: ()=>Navigator.pop(context),
+                onPressed: () => Navigator.pop(context),
                 child: const Text('Log In'),
               ),
             ],
@@ -151,7 +170,8 @@ class _SignupScreenState extends State<SignupScreen> {
       keyboardType: keyboard,
       decoration: InputDecoration(
         labelText: label,
-        filled: true, fillColor: Colors.white,
+        filled: true,
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),

@@ -32,14 +32,14 @@ class AuthShortcutButton extends StatelessWidget {
   }
 
   // Bottom sheet: Login / Sign Up
-  static void _showAuthShortcutSheet(BuildContext context) {
+  static void _showAuthShortcutSheet(BuildContext parentContext) {
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) {
+      builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           child: Column(
@@ -49,7 +49,7 @@ class AuthShortcutButton extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Welcome to Rotana',
-                style: Theme.of(context)
+                style: Theme.of(parentContext)
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800),
@@ -58,7 +58,7 @@ class AuthShortcutButton extends StatelessWidget {
               Text(
                 'Log in to manage trips, payments and documents.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
+                style: Theme.of(parentContext)
                     .textTheme
                     .bodyMedium
                     ?.copyWith(color: Colors.black54),
@@ -71,17 +71,14 @@ class AuthShortcutButton extends StatelessWidget {
                 child: FilledButton.icon(
                   icon: const Icon(Icons.login),
                   label: const Text('Log In'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => LoginScreen(
-                          onAuthSuccess: () =>
-                              Navigator.popUntil(context, (r) => r.isFirst),
-                        ),
-                      ),
+                  onPressed: () async {
+                    Navigator.pop(sheetContext);
+                    final loggedIn = await Navigator.of(parentContext).push<bool>(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
                     );
+                    if (loggedIn == true && parentContext.mounted) {
+                      Navigator.of(parentContext).popUntil((route) => route.isFirst);
+                    }
                   },
                 ),
               ),
@@ -93,19 +90,21 @@ class AuthShortcutButton extends StatelessWidget {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.person_add_alt_1),
                   label: const Text('Sign Up'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
+                  onPressed: () async {
+                    Navigator.pop(sheetContext);
+                    final registered = await Navigator.of(parentContext).push<bool>(
                       MaterialPageRoute(builder: (_) => const SignupScreen()),
                     );
+                    if (registered == true && parentContext.mounted) {
+                      Navigator.of(parentContext).popUntil((route) => route.isFirst);
+                    }
                   },
                 ),
               ),
 
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(sheetContext),
                 child: const Text('Continue as Guest'),
               ),
             ],

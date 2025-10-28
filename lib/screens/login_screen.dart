@@ -27,11 +27,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Jika callback diberi, panggil; jika tidak, tutup skrin login.
-      if (widget.onAuthSuccess != null) {
-        widget.onAuthSuccess!.call();
-      } else {
-        Navigator.pop(context);
+      // Jika callback diberi, biar parent handle navigasi tambahan.
+      widget.onAuthSuccess?.call();
+      // Sekiranya skrin ini masih aktif selepas callback, pop dengan 'true'
+      // supaya pemanggil tahu login berjaya.
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (!mounted) return;

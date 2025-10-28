@@ -1,3 +1,6 @@
+import '../config_service.dart';
+import '../utils/json_utils.dart';
+
 class DepartureTier {
   final String name;
   final double price;
@@ -6,9 +9,20 @@ class DepartureTier {
 
   factory DepartureTier.fromJson(Map<String, dynamic> j) => DepartureTier(
         name: j['name'] ?? '',
-        price: (j['price'] as num).toDouble(),
-        roomsLeft: j['rooms_left'],
+        price: readDouble(j['price']),
+        roomsLeft: readIntOrNull(j['rooms_left']),
       );
+}
+
+List<String> _resolveImages(dynamic value) {
+  if (value is List) {
+    return value
+        .map((e) => ConfigService.resolveAssetUrl(e?.toString()) ?? '')
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+  final single = ConfigService.resolveAssetUrl(value?.toString());
+  return single == null || single.isEmpty ? const [] : [single];
 }
 
 class Departure {
@@ -21,6 +35,7 @@ class Departure {
         date: j['date'] ?? '',
         note: j['note'],
         tiers: (j['tiers'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
             .map((e) => DepartureTier.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
       );
@@ -60,21 +75,28 @@ class PackageDetail {
   });
 
   factory PackageDetail.fromJson(Map<String, dynamic> j) => PackageDetail(
-        id: j['id'],
+        id: readInt(j['id']),
         title: j['title'] ?? '',
         description: j['description'] ?? '',
-        price: (j['price'] as num).toDouble(),
-        images: List<String>.from(j['images'] ?? const []),
-        durationDays: j['duration_days'],
+        price: readDouble(j['price']),
+        images: _resolveImages(j['images']),
+        durationDays: readIntOrNull(j['duration_days']),
         cities: j['cities'],
-        hotelStars: j['hotel_stars'],
-        ratingAvg: (j['rating_avg'] as num?)?.toDouble(),
-        ratingCount: j['rating_count'],
+        hotelStars: readIntOrNull(j['hotel_stars']),
+        ratingAvg: readDoubleOrNull(j['rating_avg']),
+        ratingCount: readIntOrNull(j['rating_count']),
         departures: (j['departures'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
             .map((e) => Departure.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
         inclusions: (j['inclusions'] as List? ?? []).map((e) => e.toString()).toList(),
-        itinerary: (j['itinerary'] as List? ?? []).cast<Map<String, dynamic>>(),
-        faqs: (j['faqs'] as List? ?? []).cast<Map<String, dynamic>>(),
+        itinerary: (j['itinerary'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+        faqs: (j['faqs'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
       );
 }

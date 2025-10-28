@@ -1,3 +1,5 @@
+import '../utils/json_utils.dart';
+
 class Booking {
   final int id;
   final int packageId;
@@ -20,13 +22,13 @@ class Booking {
   });
 
   factory Booking.fromJson(Map<String, dynamic> j) => Booking(
-        id: j['id'],
-        packageId: j['package_id'],
-        title: j['title'] ?? '',
-        price: (j['price'] as num).toDouble(),
-        adults: j['adults'] ?? 1,
-        children: j['children'] ?? 0,
-        status: j['status'] ?? 'CONFIRMED',
-        createdAt: DateTime.tryParse(j['created_at'] ?? '') ?? DateTime.now(),
+        id: readInt(j['id']),
+        packageId: readInt(j['package_id']),
+        title: j['title']?.toString() ?? '',
+        price: readDouble(j['price']),
+        adults: readInt(j['adults'], defaultValue: 1),
+        children: readInt(j['children']),
+        status: j['status']?.toString() ?? 'CONFIRMED',
+        createdAt: readDateTimeOrNull(j['created_at']) ?? DateTime.now(),
       );
 }

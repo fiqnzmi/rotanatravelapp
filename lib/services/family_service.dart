@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config_service.dart';
+import '../utils/json_utils.dart';
 
 class FamilyService {
   Uri _u(String p) => Uri.parse('${ConfigService.apiBase}/$p');
@@ -8,7 +9,12 @@ class FamilyService {
   Future<List<Map<String, dynamic>>> list(int userId) async {
     final res = await http.get(_u('list_family_members.php?user_id=$userId'));
     final m = jsonDecode(res.body);
-    if (m['success'] == true) return (m['data'] as List).cast<Map<String, dynamic>>();
+    if (m['success'] == true) {
+      return (m['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     throw Exception(m['error'] ?? 'Failed to load family members');
   }
 
@@ -30,7 +36,7 @@ class FamilyService {
       }),
     );
     final m = jsonDecode(res.body);
-    if (m['success'] == true) return m['data']['id'] as int;
+    if (m['success'] == true) return readInt(m['data']['id']);
     throw Exception(m['error'] ?? 'Failed to add family member');
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config_service.dart';
+import '../utils/json_utils.dart';
 
 class AuthService {
   AuthService._();
@@ -11,6 +12,7 @@ class AuthService {
   static const _keyName = 'user_name';
   static const _keyEmail = 'user_email';
   static const _keyUsername = 'user_username';
+  static const _keyPhone = 'user_phone';
 
   Uri _u(String path) => Uri.parse('${ConfigService.apiBase}/$path');
 
@@ -62,6 +64,7 @@ class AuthService {
       'name': sp.getString(_keyName),
       'username': sp.getString(_keyUsername),
       'email': sp.getString(_keyEmail),
+      'phone': sp.getString(_keyPhone),
     };
   }
 
@@ -71,6 +74,7 @@ class AuthService {
     await sp.remove(_keyName);
     await sp.remove(_keyEmail);
     await sp.remove(_keyUsername);
+    await sp.remove(_keyPhone);
   }
 
   Future<void> register({required String username, required String email, required String password}) async {
@@ -81,9 +85,9 @@ class AuthService {
     );
     final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
-      final u = m['data']['user'];
+      final u = Map<String, dynamic>.from(m['data']['user'] as Map);
       final sp = await SharedPreferences.getInstance();
-      await sp.setInt(_keyUserId, u['id']);
+      await sp.setInt(_keyUserId, readInt(u['id']));
       await sp.setString(
         _keyName,
         _resolveDisplayName(u, fallback: username),
@@ -96,6 +100,12 @@ class AuthService {
         _keyEmail,
         (u['email'] as String?)?.trim().isNotEmpty == true ? u['email'].toString().trim() : email,
       );
+      final phone = (u['phone'] as String?)?.trim();
+      if (phone != null && phone.isNotEmpty) {
+        await sp.setString(_keyPhone, phone);
+      } else {
+        await sp.remove(_keyPhone);
+      }
       return;
     }
     throw Exception(m['error'] ?? 'Registration failed');
@@ -109,10 +119,10 @@ class AuthService {
     );
     final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
-      final u = m['data']['user'];
+      final u = Map<String, dynamic>.from(m['data']['user'] as Map);
       final sp = await SharedPreferences.getInstance();
       final existingName = sp.getString(_keyName) ?? '';
-      await sp.setInt(_keyUserId, u['id']);
+      await sp.setInt(_keyUserId, readInt(u['id']));
       await sp.setString(
         _keyName,
         _resolveDisplayName(u, fallback: existingName),
@@ -127,6 +137,12 @@ class AuthService {
         _keyEmail,
         email.isNotEmpty ? email : sp.getString(_keyEmail) ?? '',
       );
+      final phone = (u['phone'] as String?)?.trim() ?? '';
+      if (phone.isNotEmpty) {
+        await sp.setString(_keyPhone, phone);
+      } else {
+        await sp.remove(_keyPhone);
+      }
       return;
     }
     throw Exception(m['error'] ?? 'Login failed');
@@ -156,5 +172,24 @@ class AuthService {
     );
     final m = _decodeResponse(res);
     if (m['success'] != true) throw Exception(m['error'] ?? 'Failed to reset password');
+  }
+
+  Future<void> updateStoredProfile({
+    String? name,
+    String? username,
+    String? email,
+    String? phone,
+  }) async {
+    final sp = await SharedPreferences.getInstance();
+    if (name != null) await sp.setString(_keyName, name);
+    if (username != null) await sp.setString(_keyUsername, username);
+    if (email != null) await sp.setString(_keyEmail, email);
+    if (phone != null) {
+      if (phone.isNotEmpty) {
+        await sp.setString(_keyPhone, phone);
+      } else {
+        await sp.remove(_keyPhone);
+      }
+    }
   }
 }

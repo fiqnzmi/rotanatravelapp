@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class ToyyibpayCheckoutScreen extends StatefulWidget {
@@ -24,6 +26,8 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
   String? _errorMessage;
+  String? _failedUrl;
+  String? _currentUrl;
 
   Uri get _returnUri => Uri.parse(widget.returnUrl);
 
@@ -32,12 +36,29 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(_buildUserAgent())
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageStarted: (url) {
+            _currentUrl = url;
+            setState(() {
+              _isLoading = true;
+              _errorMessage = null;
+              _failedUrl = null;
+            });
+          },
           onPageFinished: (_) => setState(() => _isLoading = false),
-          onWebResourceError: (error) =>
-              setState(() => _errorMessage = error.description),
+          onWebResourceError: (error) => setState(() {
+            final buffer = StringBuffer(error.description);
+            buffer.write(' (code: ${error.errorCode})');
+            final type = error.errorType.toString();
+            if (type.isNotEmpty) {
+              buffer.write(' • ${type.split('.').last}');
+            }
+            _errorMessage = buffer.toString();
+            _failedUrl = _currentUrl;
+            _isLoading = false;
+          }),
           onNavigationRequest: (request) {
             if (_matchesReturnUrl(request.url)) {
               _handleCompletion(Uri.parse(request.url));
@@ -63,6 +84,25 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
   Future<void> _handleCompletion(Uri result) async {
     if (!mounted) return;
     Navigator.of(context).pop(result);
+  }
+
+  String _buildUserAgent() {
+    final baseChromeVersion = '126.0.0.0';
+    final osVersion = Platform.isAndroid ? 'Android ${Platform.version.split(' ').first}' : Platform.operatingSystemVersion;
+    return 'Mozilla/5.0 (Linux; ${Platform.isAndroid ? 'Android' : 'X11'} $osVersion) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$baseChromeVersion Mobile Safari/537.36';
+  }
+
+  Future<void> _openExternally() async {
+    final target = _failedUrl ?? _currentUrl ?? widget.paymentUrl.toString();
+    final uri = Uri.tryParse(target);
+    if (uri == null) return;
+    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!success) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open browser.')),
+      );
+    }
   }
 
   @override
@@ -95,13 +135,20 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
                       _errorMessage!,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 12),
-                    FilledButton(
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.refresh),
                       onPressed: () {
                         setState(() => _errorMessage = null);
                         _controller.reload();
                       },
-                      child: const Text('Retry'),
+                      label: const Text('Retry'),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      onPressed: _openExternally,
+                      label: const Text('Open in browser'),
                     ),
                   ],
                 ),

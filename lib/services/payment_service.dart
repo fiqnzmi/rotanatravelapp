@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config_service.dart';
+import '../utils/json_utils.dart';
 
 class PaymentService {
   Uri _u(String path) => Uri.parse('${ConfigService.apiBase}/$path');
@@ -24,7 +25,7 @@ class PaymentService {
       body: jsonEncode({'booking_id': bookingId, 'amount': amount, 'method': method, 'notes': notes}),
     );
     final m = jsonDecode(res.body);
-    if (m['success'] == true) return m['data']['id'] as int;
+    if (m['success'] == true) return readInt(m['data']['id']);
     throw Exception(m['error'] ?? 'Failed to create payment');
   }
 

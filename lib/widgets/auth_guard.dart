@@ -39,15 +39,14 @@ class AuthGuard extends StatelessWidget {
                 FilledButton.icon(
                   icon: const Icon(Icons.login),
                   label: const Text('Log In'),
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => LoginScreen(
-                        onAuthSuccess: () {
-                          // return to the guarded screen after login
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ));
+                  onPressed: () async {
+                    final loggedIn = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                    if (loggedIn == true && context.mounted) {
+                      // rebuild by triggering FutureBuilder to refetch
+                      (context as Element).markNeedsBuild();
+                    }
                   },
                 ),
               ],

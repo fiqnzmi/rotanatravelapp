@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../models/booking.dart';
 import 'documents_screen.dart';
 import 'payments_screen.dart';
+import 'login_screen.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -15,10 +16,22 @@ class TripsScreen extends StatefulWidget {
 class _TripsScreenState extends State<TripsScreen> {
   final _svc = BookingService();
   final _dash = DashboardService();
-  late Future<List<Booking>> _future;
+  late Future<_TripsResult> _future;
 
   @override
-  void initState() { super.initState(); _future = _svc.myBookings(); }
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<_TripsResult> _load() async {
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      return const _TripsResult(loggedIn: false, bookings: []);
+    }
+    final bookings = await _svc.myBookings();
+    return _TripsResult(loggedIn: true, bookings: bookings);
+  }
 
   Widget _stepsBar(List<Map<String, dynamic>> steps) {
     final done = steps.where((s) => s['done'] == true).length;
@@ -82,9 +95,26 @@ class _TripsScreenState extends State<TripsScreen> {
         body: FutureBuilder(
           future: _future,
           builder: (ctx, snap) {
-            if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-            if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-            final all = (snap.data as List<Booking>);
+            if (snap.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snap.hasError) {
+              return Center(child: Text('Error: ${snap.error}'));
+            }
+            final result = snap.data as _TripsResult;
+            if (!result.loggedIn) {
+              return _TripsLoginPrompt(onLogin: () async {
+                final loggedIn = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const LoginScreen(),
+                  ),
+                );
+                if (loggedIn == true && mounted) {
+                  setState(() => _future = _load());
+                }
+              });
+            }
+            final all = result.bookings;
             final upcoming = all.where((b)=>b.status=='CONFIRMED').toList();
             final past = all.where((b)=>b.status!='CONFIRMED').toList();
             return TabBarView(children: [_list(upcoming), _list(past)]);
@@ -127,6 +157,50 @@ class _TripsScreenState extends State<TripsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _TripsResult {
+  final bool loggedIn;
+  final List<Booking> bookings;
+  const _TripsResult({required this.loggedIn, required this.bookings});
+}
+
+class _TripsLoginPrompt extends StatelessWidget {
+  const _TripsLoginPrompt({required this.onLogin});
+  final Future<void> Function() onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          const Icon(Icons.flight_takeoff_outlined, size: 72, color: Colors.grey),
+          const SizedBox(height: 24),
+          Text(
+            'Log in to view your trips',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Save bookings, track progress, and manage documents once you sign in.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () { onLogin(); },
+            child: const Text('Log In'),
+          ),
+        ],
+      ),
     );
   }
 }
