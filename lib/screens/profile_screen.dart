@@ -1,8 +1,21 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
+import '../config_service.dart';
 import '../services/dashboard_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'family_members_screen.dart';
+
+DateTime? _parseDate(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString();
+  if (text.isEmpty) return null;
+  return DateTime.tryParse(text);
+}
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,6 +25,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _svc = DashboardService();
+  final ImagePicker _picker = ImagePicker();
   late Future<_ProfileResult> _future;
   String _language = 'en';
   bool _languageInitialized = false;
@@ -20,6 +34,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  Future<void> _addFamilyMember() async {
+    final saved = await showFamilyMemberForm(context);
+    if (saved && mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  Future<void> _editFamilyMember(Map<String, dynamic> member) async {
+    final saved = await showFamilyMemberForm(context, initial: member);
+    if (saved && mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
   }
 
   Future<_ProfileResult> _load() async {
@@ -38,16 +70,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  String? _photoFromMap(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    final raw = map['photo'] ??
+        map['photo_url'] ??
+        map['avatar'] ??
+        map['profile_image'] ??
+        map['profile_photo'] ??
+        map['image'] ?? map['url'];
+    if (raw == null) return null;
+    final url = raw.toString();
+    return ConfigService.resolveAssetUrl(url) ?? url;
+  }
+
   Future<void> _openEditProfile(Map<String, dynamic> user) async {
     final parentContext = context;
     final messenger = ScaffoldMessenger.of(parentContext);
-    final userId = user['id'] ?? user['user_id'];
-    if (userId == null) {
+    final dynamic userIdRaw = user['id'] ?? user['user_id'];
+    if (userIdRaw == null) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Cannot edit profile: missing user id.')),
       );
       return;
     }
+    final userIdString = userIdRaw.toString();
+    final int? userIdInt = int.tryParse(userIdString);
     final nameC = TextEditingController(text: user['name']?.toString() ?? '');
     final usernameC =
         TextEditingController(text: user['username']?.toString() ?? '');
@@ -60,6 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               '')
           .toString(),
     );
+    final existingPhotoUrl = _photoFromMap(user);
+    File? selectedPhotoFile;
+    String? previewPhotoUrl = existingPhotoUrl;
     final formKey = GlobalKey<FormState>();
 
     final updated = await showModalBottomSheet<bool>(
@@ -69,6 +119,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
         bool saving = false;
         return StatefulBuilder(
           builder: (context, setModalState) {
+            Future<void> pickImage(ImageSource source) async {
+              try {
+                final picked = await _picker.pickImage(
+                  source: source,
+                  maxWidth: 1600,
+                  maxHeight: 1600,
+                  imageQuality: 85,
+                );
+                if (picked != null) {
+                  setModalState(() {
+                    selectedPhotoFile = File(picked.path);
+                    previewPhotoUrl = null;
+                  });
+                }
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to pick image: $e')),
+                );
+              }
+            }
+
+            ImageProvider? displayImage;
+            if (selectedPhotoFile != null) {
+              displayImage = FileImage(selectedPhotoFile!);
+            } else if (previewPhotoUrl != null) {
+              displayImage = NetworkImage(previewPhotoUrl!);
+            }
+            final bool canRemovePhoto = selectedPhotoFile != null ||
+                (previewPhotoUrl != null && previewPhotoUrl != existingPhotoUrl);
+
             return SafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.only(
@@ -102,6 +182,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      Center(
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 48,
+                              backgroundColor: const Color(0xFFE3E9F2),
+                              backgroundImage: displayImage,
+                              child: displayImage == null
+                                  ? const Icon(Icons.person_outline, size: 42, color: Colors.black38)
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 12,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: saving ? null : () => pickImage(ImageSource.gallery),
+                                  icon: const Icon(Icons.photo_library_outlined),
+                                  label: const Text('Choose Photo'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: saving ? null : () => pickImage(ImageSource.camera),
+                                  icon: const Icon(Icons.camera_alt_outlined),
+                                  label: const Text('Camera'),
+                                ),
+                                if (canRemovePhoto)
+                                  TextButton(
+                                    onPressed: saving
+                                        ? null
+                                        : () {
+                                            setModalState(() {
+                                              selectedPhotoFile = null;
+                                              previewPhotoUrl = existingPhotoUrl;
+                                            });
+                                          },
+                                    child: const Text('Remove'),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       TextFormField(
                         controller: nameC,
                         textInputAction: TextInputAction.next,
@@ -162,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 setModalState(() => saving = true);
                                 try {
                                   final payload = <String, dynamic>{
-                                    'user_id': '$userId',
+                                    'user_id': userIdString,
                                     'name': nameC.text.trim(),
                                     'username': usernameC.text.trim(),
                                     'email': emailC.text.trim(),
@@ -177,28 +302,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   );
                                   final response =
                                       await _svc.updateProfile(payload);
-                                  Map<String, dynamic> storedUser =
-                                      Map<String, dynamic>.from(response);
-                                  final userData = response['user'];
-                                  if (userData is Map) {
-                                    storedUser =
-                                        Map<String, dynamic>.from(userData);
+                                  Map<String, dynamic> storedUser = {};
+                                  if (response is Map<String, dynamic>) {
+                                    storedUser = Map<String, dynamic>.from(response);
+                                    final userData = response['user'];
+                                    if (userData is Map) {
+                                      storedUser = Map<String, dynamic>.from(userData);
+                                    }
                                   }
-                                  await AuthService.instance
-                                      .updateStoredProfile(
-                                    name: storedUser['name']?.toString() ??
-                                        nameC.text.trim(),
-                                    username: storedUser['username']
-                                            ?.toString() ??
-                                        usernameC.text.trim(),
-                                    email: storedUser['email']?.toString() ??
-                                        emailC.text.trim(),
-                                    phone: (storedUser['phone'] ??
-                                                storedUser['mobile'] ??
-                                                storedUser['contact'] ??
-                                                storedUser['phone_number'])
-                                            ?.toString() ??
-                                        phoneC.text.trim(),
+                                  final updatedName =
+                                      storedUser['name']?.toString() ?? nameC.text.trim();
+                                  final updatedUsername =
+                                      storedUser['username']?.toString() ?? usernameC.text.trim();
+                                  final updatedEmail =
+                                      storedUser['email']?.toString() ?? emailC.text.trim();
+                                  final updatedPhone = (storedUser['phone'] ??
+                                          storedUser['mobile'] ??
+                                          storedUser['contact'] ??
+                                          storedUser['phone_number'])
+                                      ?.toString() ??
+                                      phoneC.text.trim();
+                                  String? finalPhotoUrl =
+                                      _photoFromMap(storedUser) ?? previewPhotoUrl ?? existingPhotoUrl;
+
+                                  if (selectedPhotoFile != null) {
+                                    if (userIdInt == null) {
+                                      throw Exception('Invalid user id for uploading photo.');
+                                    }
+                                    final uploadData = await _svc.uploadProfilePhoto(
+                                      userId: userIdInt,
+                                      file: selectedPhotoFile!,
+                                    );
+                                    final uploadedPhoto = _photoFromMap(uploadData);
+                                    if (uploadedPhoto != null) {
+                                      finalPhotoUrl = uploadedPhoto;
+                                    }
+                                  }
+
+                                  await AuthService.instance.updateStoredProfile(
+                                    name: updatedName,
+                                    username: updatedUsername,
+                                    email: updatedEmail,
+                                    phone: updatedPhone,
+                                    photoUrl: finalPhotoUrl ?? '',
                                   );
                                   Navigator.of(sheetContext).pop(true);
                                 } catch (e) {
@@ -316,11 +462,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             });
           }
 
+          final photoUrl = _photoFromMap(user);
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
             children: [
               _ProfileHeader(
                 user: user,
+                photoUrl: photoUrl,
                 onEdit: () => _openEditProfile(user),
               ),
               const SizedBox(height: 16),
@@ -340,6 +489,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     builder: (_) => const FamilyMembersScreen(),
                   ),
                 ),
+                onAdd: _addFamilyMember,
+                onEdit: (member) => _editFamilyMember(Map<String, dynamic>.from(member)),
               ),
               const SizedBox(height: 12),
               _EmergencyContactCard(contact: emergency),
@@ -385,8 +536,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.user, required this.onEdit});
+  const _ProfileHeader({required this.user, required this.photoUrl, required this.onEdit});
   final Map<String, dynamic> user;
+  final String? photoUrl;
   final VoidCallback onEdit;
 
   @override
@@ -399,6 +551,10 @@ class _ProfileHeader extends StatelessWidget {
             user['phone_number'] ??
             '')
         .toString();
+    ImageProvider<Object>? avatarImage;
+    if (photoUrl != null && photoUrl!.isNotEmpty) {
+      avatarImage = NetworkImage(photoUrl!);
+    }
     final initials = name.trim().isNotEmpty
         ? name
             .trim()
@@ -424,10 +580,13 @@ class _ProfileHeader extends StatelessWidget {
           CircleAvatar(
             radius: 32,
             backgroundColor: const Color(0xFFEEF1F7),
-            child: Text(
-              initials,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
+            backgroundImage: avatarImage,
+            child: avatarImage == null
+                ? Text(
+                    initials,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  )
+                : null,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -562,11 +721,15 @@ class _SavedTravellersCard extends StatelessWidget {
     required this.travellerCount,
     required this.travellers,
     required this.onViewAll,
+    required this.onAdd,
+    this.onEdit,
   });
 
   final int travellerCount;
   final List<Map<String, dynamic>> travellers;
   final VoidCallback onViewAll;
+  final VoidCallback onAdd;
+  final void Function(Map<String, dynamic> member)? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +754,7 @@ class _SavedTravellersCard extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                onPressed: onViewAll,
+                onPressed: onAdd,
                 icon: const Icon(Icons.add),
                 tooltip: 'Add traveller',
               ),
@@ -606,7 +769,7 @@ class _SavedTravellersCard extends StatelessWidget {
             ...preview.map(
               (m) {
                 final name = (m['full_name'] ?? m['name'] ?? '').toString();
-                final relation = (m['relationship'] ?? m['type'] ?? '').toString();
+                final subtitle = _travellerSubtitle(m);
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
@@ -617,8 +780,8 @@ class _SavedTravellersCard extends StatelessWidget {
                     ),
                   ),
                   title: Text(name.isEmpty ? 'Traveller' : name),
-                  subtitle: relation.isEmpty ? null : Text(relation),
-                  onTap: onViewAll,
+                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
+                  onTap: onEdit != null ? () => onEdit!(m) : onViewAll,
                   dense: true,
                 );
               },
@@ -634,6 +797,21 @@ class _SavedTravellersCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _travellerSubtitle(Map<String, dynamic> member) {
+    final parts = <String>[];
+    final relation = (member['relationship'] ?? member['type'] ?? '').toString();
+    if (relation.isNotEmpty) parts.add(relation);
+    final nationality = (member['nationality'] ?? '').toString();
+    if (nationality.isNotEmpty) parts.add(nationality);
+    final passport = (member['passport_no'] ?? '').toString();
+    if (passport.isNotEmpty) parts.add('Passport: $passport');
+    final dob = _parseDate(member['dob']);
+    if (dob != null) {
+      parts.add('DOB: ${DateFormat('dd/MM/yyyy').format(dob)}');
+    }
+    return parts.join(' ? ');
   }
 }
 

@@ -13,6 +13,7 @@ class AuthService {
   static const _keyEmail = 'user_email';
   static const _keyUsername = 'user_username';
   static const _keyPhone = 'user_phone';
+  static const _keyPhoto = 'user_photo';
 
   Uri _u(String path) => Uri.parse('${ConfigService.apiBase}/$path');
 
@@ -65,6 +66,8 @@ class AuthService {
       'username': sp.getString(_keyUsername),
       'email': sp.getString(_keyEmail),
       'phone': sp.getString(_keyPhone),
+      'photo': sp.getString(_keyPhoto),
+      'phone': sp.getString(_keyPhone),
     };
   }
 
@@ -75,6 +78,7 @@ class AuthService {
     await sp.remove(_keyEmail);
     await sp.remove(_keyUsername);
     await sp.remove(_keyPhone);
+    await sp.remove(_keyPhoto);
   }
 
   Future<void> register({required String username, required String email, required String password}) async {
@@ -105,6 +109,12 @@ class AuthService {
         await sp.setString(_keyPhone, phone);
       } else {
         await sp.remove(_keyPhone);
+      }
+      final photo = (u['photo'] ?? u['photo_url'] ?? u['avatar'] ?? u['profile_image'])?.toString();
+      if (photo != null && photo.isNotEmpty) {
+        await sp.setString(_keyPhoto, photo);
+      } else {
+        await sp.remove(_keyPhoto);
       }
       return;
     }
@@ -143,6 +153,12 @@ class AuthService {
       } else {
         await sp.remove(_keyPhone);
       }
+      final photo = (u['photo'] ?? u['photo_url'] ?? u['avatar'] ?? u['profile_image'])?.toString() ?? '';
+      if (photo.isNotEmpty) {
+        await sp.setString(_keyPhoto, photo);
+      } else {
+        await sp.remove(_keyPhoto);
+      }
       return;
     }
     throw Exception(m['error'] ?? 'Login failed');
@@ -179,6 +195,7 @@ class AuthService {
     String? username,
     String? email,
     String? phone,
+    String? photoUrl,
   }) async {
     final sp = await SharedPreferences.getInstance();
     if (name != null) await sp.setString(_keyName, name);
@@ -189,6 +206,13 @@ class AuthService {
         await sp.setString(_keyPhone, phone);
       } else {
         await sp.remove(_keyPhone);
+      }
+    }
+    if (photoUrl != null) {
+      if (photoUrl.isNotEmpty) {
+        await sp.setString(_keyPhoto, photoUrl);
+      } else {
+        await sp.remove(_keyPhoto);
       }
     }
   }

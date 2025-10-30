@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/booking_service.dart';
 import '../models/traveller.dart';
+import '../services/auth_service.dart';
 import 'trips_screen.dart';
+import 'login_screen.dart';
 
 class BookingWizardScreen extends StatefulWidget {
   final int packageId;
@@ -70,6 +72,18 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final proceed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+      if (proceed != true) {
+        return;
+      }
+    }
+
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
