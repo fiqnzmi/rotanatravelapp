@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../services/booking_service.dart';
 import '../models/traveller.dart';
 import '../services/auth_service.dart';
+import '../services/family_service.dart';
+import '../utils/json_utils.dart';
 import 'trips_screen.dart';
 import 'login_screen.dart';
 
@@ -23,6 +25,7 @@ class BookingWizardScreen extends StatefulWidget {
 
 class _BookingWizardScreenState extends State<BookingWizardScreen> {
   final _svc = BookingService();
+  final _family = FamilyService();
   final _formKey = GlobalKey<FormState>();
   final List<Traveller> travellers = [];
   final DateFormat _uiDateFormat = DateFormat('dd/MM/yyyy');
@@ -240,6 +243,11 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
+              TextButton.icon(
+                onPressed: () => _pickSavedForSlot(index),
+                icon: const Icon(Icons.person_search, size: 18),
+                label: const Text('Use saved'),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -395,6 +403,140 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
     if (picked != null) {
       setState(() => onSelected(picked));
     }
+  }
+
+  Future<void> _pickSavedForSlot(int index) async {
+    // Must be logged in to access family list
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final proceed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    final userId = await AuthService.instance.getUserId();
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to use saved travellers.')),
+      );
+      return;
+    }
+
+    List<Map<String, dynamic>> family;
+    try {
+      family = await _family.list(userId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load saved travellers: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    if (family.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No saved travellers found. Add in Profile > Family Members.')),
+      );
+      return;
+    }
+
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (_, controller) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Select saved traveller',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    controller: controller,
+                    itemCount: family.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final f = family[i];
+                      final name = (f['full_name'] ?? f['name'] ?? '').toString();
+                      final rel = (f['relationship'] ?? '').toString();
+                      final gender = (f['gender'] ?? '').toString();
+                      final dob = readDateTimeOrNull(f['dob']);
+                      final passport = (f['passport_no'] ?? '').toString();
+                      final ageYears = dob == null ? null : (DateTime.now().difference(dob).inDays / 365.25).floor();
+                      final badge = ageYears == null
+                          ? (rel.isNotEmpty ? rel : (gender.isNotEmpty ? gender : ''))
+                          : (ageYears < 12 ? 'Child' : 'Adult');
+                      return ListTile(
+                        title: Text(name.isNotEmpty ? name : 'Unnamed'),
+                        subtitle: Text([
+                          if (badge.isNotEmpty) badge,
+                          if (passport.isNotEmpty) 'Passport: $passport',
+                        ].join(' • ')),
+                        onTap: () => Navigator.of(ctx).pop(f),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (selected == null) return;
+
+    final current = travellers[index];
+    final replacement = _travellerFromFamily(selected, isChildSlot: current.isChild);
+    setState(() {
+      travellers[index] = replacement; // new object to refresh initialValue fields
+    });
+
+    final badge = selected['relationship']?.toString() ?? '';
+    if (mounted && badge.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Filled from "$badge" saved traveller.')),
+      );
+    }
+  }
+
+  Traveller _travellerFromFamily(Map<String, dynamic> f, {required bool isChildSlot}) {
+    final dob = readDateTimeOrNull(f['dob']);
+    final issue = readDateTimeOrNull(f['passport_issue_date']);
+    final expiry = readDateTimeOrNull(f['passport_expiry_date']);
+    final name = (f['full_name'] ?? f['name'] ?? '').toString();
+    final gender = (f['gender'] ?? '').toString().toLowerCase();
+    final passport = (f['passport_no'] ?? '').toString();
+
+    return Traveller(
+      fullName: name,
+      gender: gender.isNotEmpty ? gender : null,
+      dateOfBirth: dob,
+      passportNo: passport.isNotEmpty ? passport : null,
+      passportIssueDate: issue,
+      passportExpiryDate: expiry,
+      isChild: isChildSlot,
+    );
   }
 
   Widget _countSelector({

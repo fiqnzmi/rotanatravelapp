@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../config_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/family_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'family_members_screen.dart';
@@ -25,10 +26,15 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _svc = DashboardService();
+  final _family = FamilyService();
   final ImagePicker _picker = ImagePicker();
   late Future<_ProfileResult> _future;
   String _language = 'en';
   bool _languageInitialized = false;
+  bool _notifyEmail = true;
+  bool _notifySms = false;
+  bool _notificationsInitialized = false;
+  bool _notificationsSaving = false;
 
   @override
   void initState() {
@@ -54,6 +60,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _chooseEmergencyContact() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      if (ok != true) return;
+    }
+
+    final userId = await AuthService.instance.getUserId();
+    if (userId == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please login to set emergency contact.')),
+      );
+      return;
+    }
+
+    List<Map<String, dynamic>> members;
+    try {
+      members = await _family.list(userId);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to load family: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final choice = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              const Text('Select emergency contact', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemCount: members.length + 1,
+                  itemBuilder: (_, i) {
+                    if (i == 0) {
+                      return ListTile(
+                        leading: const Icon(Icons.clear),
+                        title: const Text('Clear emergency contact'),
+                        onTap: () => Navigator.of(ctx).pop(<String, dynamic>{'id': 0}),
+                      );
+                    }
+                    final m = members[i - 1];
+                    final name = (m['full_name'] ?? m['name'] ?? '').toString();
+                    final relation = (m['relationship'] ?? '').toString();
+                    final phone = (m['phone'] ?? m['mobile'] ?? '').toString();
+                    return ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(name.isNotEmpty ? name : 'Unnamed'),
+                      subtitle: Text([
+                        if (relation.isNotEmpty) relation,
+                        if (phone.isNotEmpty) phone,
+                      ].join(' • ')),
+                      onTap: () => Navigator.of(ctx).pop(m),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (choice == null) return;
+    final id = int.tryParse((choice['id'] ?? '0').toString()) ?? 0;
+
+    try {
+      await _svc.updateProfile({
+        'user_id': '$userId',
+        'emergency_contact_id': '$id',
+      });
+      if (!mounted) return;
+      setState(() {
+        _future = _load();
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(id == 0 ? 'Emergency contact cleared.' : 'Emergency contact updated.'),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to update: $e')),
+      );
+    }
+  }
+
+  Future<void> _updateNotificationPref({bool? email, bool? sms}) async {
+    if (_notificationsSaving) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      if (ok != true) return;
+    }
+
+    final userId = await AuthService.instance.getUserId();
+    if (userId == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please login to update notifications.')),
+      );
+      return;
+    }
+
+    final prevEmail = _notifyEmail;
+    final prevSms = _notifySms;
+    final nextEmail = email ?? _notifyEmail;
+    final nextSms = sms ?? _notifySms;
+
+    setState(() {
+      _notifyEmail = nextEmail;
+      _notifySms = nextSms;
+      _notificationsSaving = true;
+    });
+
+    try {
+      await _svc.updateProfile({
+        'user_id': '$userId',
+        'notify_email': nextEmail ? '1' : '0',
+        'notify_sms': nextSms ? '1' : '0',
+      });
+      if (!mounted) return;
+      setState(() {
+        _notificationsSaving = false;
+      });
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Notification preferences updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _notifyEmail = prevEmail;
+        _notifySms = prevSms;
+        _notificationsSaving = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to update notifications: $e')),
+      );
+    }
+  }
+
   Future<_ProfileResult> _load() async {
     final isLoggedIn = await AuthService.instance.isLoggedIn();
     if (!isLoggedIn) {
@@ -68,6 +232,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       loggedIn: true,
       payload: Map<String, dynamic>.from(payload),
     );
+  }
+
+  bool _readBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final trimmed = value.trim().toLowerCase();
+      if (trimmed.isEmpty) return fallback;
+      if (trimmed == '1' || trimmed == 'true' || trimmed == 'yes' || trimmed == 'y') {
+        return true;
+      }
+      if (trimmed == '0' || trimmed == 'false' || trimmed == 'no' || trimmed == 'n') {
+        return false;
+      }
+    }
+    return fallback;
   }
 
   String? _photoFromMap(Map<String, dynamic>? map) {
@@ -462,6 +642,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
             });
           }
 
+          if (!_notificationsInitialized) {
+            final emailPref = _readBool(
+              user['notify_email'] ??
+                  user['email_notifications'] ??
+                  user['pref_email'] ??
+                  user['notification_email'],
+              fallback: true,
+            );
+            final smsPref = _readBool(
+              user['notify_sms'] ??
+                  user['sms_notifications'] ??
+                  user['pref_sms'] ??
+                  user['notification_sms'],
+              fallback: false,
+            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _notifyEmail = emailPref;
+                _notifySms = smsPref;
+                _notificationsInitialized = true;
+              });
+            });
+          }
+
           final photoUrl = _photoFromMap(user);
 
           return ListView(
@@ -493,7 +698,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onEdit: (member) => _editFamilyMember(Map<String, dynamic>.from(member)),
               ),
               const SizedBox(height: 12),
-              _EmergencyContactCard(contact: emergency),
+              _EmergencyContactCard(
+                contact: emergency,
+                onEdit: _chooseEmergencyContact,
+              ),
+              const SizedBox(height: 12),
+              _NotificationsCard(
+                emailEnabled: _notifyEmail,
+                smsEnabled: _notifySms,
+                loading: _notificationsSaving,
+                onEmailChanged: (value) => _updateNotificationPref(email: value),
+                onSmsChanged: (value) => _updateNotificationPref(sms: value),
+              ),
               const SizedBox(height: 12),
               _LanguageCard(
                 selected: _language,
@@ -816,8 +1032,9 @@ class _SavedTravellersCard extends StatelessWidget {
 }
 
 class _EmergencyContactCard extends StatelessWidget {
-  const _EmergencyContactCard({required this.contact});
+  const _EmergencyContactCard({required this.contact, this.onEdit});
   final Map<String, dynamic> contact;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -851,7 +1068,7 @@ class _EmergencyContactCard extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                onPressed: () {},
+                onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Edit emergency contact',
               ),
@@ -882,6 +1099,72 @@ class _EmergencyContactCard extends StatelessWidget {
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationsCard extends StatelessWidget {
+  const _NotificationsCard({
+    required this.emailEnabled,
+    required this.smsEnabled,
+    required this.loading,
+    required this.onEmailChanged,
+    required this.onSmsChanged,
+  });
+
+  final bool emailEnabled;
+  final bool smsEnabled;
+  final bool loading;
+  final ValueChanged<bool> onEmailChanged;
+  final ValueChanged<bool> onSmsChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Notifications',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              if (loading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile.adaptive(
+            value: emailEnabled,
+            onChanged: loading ? null : onEmailChanged,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Email updates'),
+            subtitle: const Text('Receive booking reminders and payment receipts by email.'),
+          ),
+          const Divider(height: 1),
+          SwitchListTile.adaptive(
+            value: smsEnabled,
+            onChanged: loading ? null : onSmsChanged,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('SMS alerts'),
+            subtitle: const Text('Get important travel alerts via SMS.'),
+          ),
         ],
       ),
     );

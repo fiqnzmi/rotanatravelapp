@@ -28,6 +28,7 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
   String? _errorMessage;
   String? _failedUrl;
   String? _currentUrl;
+  bool _autoLaunchedExternal = false;
 
   Uri get _returnUri => Uri.parse(widget.returnUrl);
 
@@ -48,17 +49,25 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
             });
           },
           onPageFinished: (_) => setState(() => _isLoading = false),
-          onWebResourceError: (error) => setState(() {
-            final buffer = StringBuffer(error.description);
-            buffer.write(' (code: ${error.errorCode})');
-            final type = error.errorType.toString();
-            if (type.isNotEmpty) {
-              buffer.write(' • ${type.split('.').last}');
+          onWebResourceError: (error) {
+            setState(() {
+              final buffer = StringBuffer(error.description);
+              buffer.write(' (code: ${error.errorCode})');
+              final type = error.errorType.toString();
+              if (type.isNotEmpty) {
+                buffer.write(' • ${type.split('.').last}');
+              }
+              _errorMessage = buffer.toString();
+              _failedUrl = _currentUrl;
+              _isLoading = false;
+            });
+            // Some FPX bank pages block Android WebView. Fallback to external browser automatically once.
+            if (Platform.isAndroid && !_autoLaunchedExternal) {
+              _autoLaunchedExternal = true;
+              // Give the UI a tick to settle before launching.
+              scheduleMicrotask(() => _openExternally());
             }
-            _errorMessage = buffer.toString();
-            _failedUrl = _currentUrl;
-            _isLoading = false;
-          }),
+          },
           onNavigationRequest: (request) {
             if (_matchesReturnUrl(request.url)) {
               _handleCompletion(Uri.parse(request.url));
