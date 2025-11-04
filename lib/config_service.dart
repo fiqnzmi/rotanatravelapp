@@ -113,10 +113,10 @@ class ConfigService {
   static String get toyyibpayBaseUrl => 'https://$toyyibpayHost';
   static String get toyyibpayReturnUrl => const String.fromEnvironment(
         'TOYYIBPAY_RETURN_URL',
-        defaultValue: 'https://example.com/payment-return',
+        defaultValue: 'https://ruangprojek.com/rotanatravel/rotanatravelapi/toyyibpay_return.php',
       );
   static String get toyyibpayCallbackUrl => const String.fromEnvironment(
         'TOYYIBPAY_CALLBACK_URL',
-        defaultValue: 'https://example.com/payment-callback',
+        defaultValue: 'https://ruangprojek.com/rotanatravel/rotanatravelapi/api/toyyibpay_callback.php',
       );
 }

@@ -68,21 +68,19 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           (summary['package_title'] as String?)?.trim().isNotEmpty == true
               ? summary['package_title'] as String
               : 'Rotana Travel Booking';
-        final phone = _pickPhone(summary, user);
-        final uri = await _gateway.createBill(
-          amount: amountDue,
-          customerName: name,
-          customerEmail: email,
-        customerPhone: phone,
-        reference: 'BOOK-${widget.bookingId}',
+      final phone = _pickPhone(summary, user);
+      final bill = await _gateway.createBill(
+        bookingId: widget.bookingId,
+        amount: amountDue,
         description: description,
+        customerPhone: phone,
       );
 
       if (!mounted) return;
       final resultUri = await Navigator.of(context).push<Uri?>(
         MaterialPageRoute(
           builder: (_) => ToyyibpayCheckoutScreen(
-            paymentUrl: uri,
+            paymentUrl: bill.paymentUrl,
             returnUrl: ConfigService.toyyibpayReturnUrl,
             title: 'Toyyibpay',
           ),
@@ -100,23 +98,26 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         bool recorded = false;
         String? recordError;
         if (resultUri.queryParameters['status_id'] == '1') {
-          final billCode = resultUri.queryParameters['billcode'] ?? '';
-          final transactionId =
-              resultUri.queryParameters['transaction_id'] ?? '';
-          try {
-            final paymentId = await _svc.create(
-              bookingId: widget.bookingId,
-              amount: amountDue,
-              method: 'FPX',
-              notes: billCode.isNotEmpty
-                  ? 'Toyyibpay bill $billCode'
-                  : 'Toyyibpay payment',
-            );
-            await _svc.markPaid(
-              paymentId,
-              txRef: transactionId.isNotEmpty ? transactionId : billCode,
-            );
-            recorded = true;
+              final billCode =
+                  resultUri.queryParameters['billcode'] ?? bill.billCode;
+              final transactionId =
+                  resultUri.queryParameters['transaction_id'] ?? '';
+              try {
+                final paymentId = bill.paymentId > 0
+                    ? bill.paymentId
+                    : await _svc.create(
+                        bookingId: widget.bookingId,
+                        amount: amountDue,
+                        method: 'FPX',
+                        notes: billCode.isNotEmpty
+                            ? 'Toyyibpay bill $billCode'
+                            : 'Toyyibpay payment',
+                      );
+                await _svc.markPaid(
+                  paymentId,
+                  txRef: transactionId.isNotEmpty ? transactionId : billCode,
+                );
+                recorded = true;
           } catch (e) {
             recordError = e.toString();
           }

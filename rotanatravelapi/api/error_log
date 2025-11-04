@@ -1,0 +1,15 @@
+[24-Oct-2025 14:03:23 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'method' at row 1 in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php:9
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php(9): PDOStatement->execute()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php on line 9
+[24-Oct-2025 14:05:17 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'method' at row 1 in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php:9
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php(9): PDOStatement->execute()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/create_payment.php on line 9
+[28-Oct-2025 14:41:28 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sabrisae_rotanatravel.password_resets' doesn't exist in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/request_password_reset.php:13
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/request_password_reset.php(13): PDOStatement->execute()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/rotanatravelapi/api/request_password_reset.php on line 13

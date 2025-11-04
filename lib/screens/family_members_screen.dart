@@ -9,289 +9,320 @@ Future<bool> showFamilyMemberForm(
   BuildContext context, {
   Map<String, dynamic>? initial,
 }) async {
-  final svc = FamilyService();
-  final formKey = GlobalKey<FormState>();
-  final nameC = TextEditingController(text: initial?['full_name']?.toString() ?? '');
-  final nationalityC = TextEditingController(text: initial?['nationality']?.toString() ?? '');
-  final passportC = TextEditingController(text: initial?['passport_no']?.toString() ?? '');
-  final phoneC = TextEditingController(text: initial?['phone']?.toString() ?? '');
-  String relationship = (initial?['relationship'] ?? 'OTHER').toString().toUpperCase();
-  String gender = (initial?['gender'] ?? '').toString().toLowerCase();
-  DateTime? dob = _parseDate(initial?['dob']);
-  DateTime? passportIssueDate = _parseDate(initial?['passport_issue_date']);
-  DateTime? passportExpiryDate = _parseDate(initial?['passport_expiry_date']);
-
-  bool? result = await showModalBottomSheet<bool>(
+  final result = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) {
-      bool saving = false;
+    builder: (_) => _FamilyMemberFormSheet(initial: initial),
+  );
+  return result == true;
+}
 
-      Future<void> pickDate({
-        required DateTime? current,
-        required DateTime first,
-        required DateTime last,
-        required ValueChanged<DateTime> onSelected,
-      }) async {
-        final picked = await showDatePicker(
-          context: sheetContext,
-          initialDate: current ?? DateTime.now(),
-          firstDate: first,
-          lastDate: last,
-        );
-        if (picked != null) {
-          onSelected(picked);
-        }
+class _FamilyMemberFormSheet extends StatefulWidget {
+  const _FamilyMemberFormSheet({this.initial});
+
+  final Map<String, dynamic>? initial;
+
+  @override
+  State<_FamilyMemberFormSheet> createState() => _FamilyMemberFormSheetState();
+}
+
+class _FamilyMemberFormSheetState extends State<_FamilyMemberFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _svc = FamilyService();
+
+  late final TextEditingController _nameC =
+      TextEditingController(text: widget.initial?['full_name']?.toString() ?? '');
+  late final TextEditingController _nationalityC =
+      TextEditingController(text: widget.initial?['nationality']?.toString() ?? '');
+  late final TextEditingController _passportC =
+      TextEditingController(text: widget.initial?['passport_no']?.toString() ?? '');
+  late final TextEditingController _phoneC =
+      TextEditingController(text: widget.initial?['phone']?.toString() ?? '');
+
+  late String _relationship =
+      (widget.initial?['relationship'] ?? 'OTHER').toString().toUpperCase();
+  late String _gender = (widget.initial?['gender'] ?? '').toString().toLowerCase();
+  DateTime? _dob;
+  DateTime? _passportIssueDate;
+  DateTime? _passportExpiryDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _dob = _parseDate(widget.initial?['dob']);
+    _passportIssueDate = _parseDate(widget.initial?['passport_issue_date']);
+    _passportExpiryDate = _parseDate(widget.initial?['passport_expiry_date']);
+  }
+
+  @override
+  void dispose() {
+    _nameC.dispose();
+    _nationalityC.dispose();
+    _passportC.dispose();
+    _phoneC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({
+    required DateTime? current,
+    required DateTime first,
+    required DateTime last,
+    required ValueChanged<DateTime> onSelected,
+  }) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now(),
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked != null && mounted) {
+      onSelected(picked);
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+    if (_dob == null || _passportIssueDate == null || _passportExpiryDate == null) {
+      _showSnack('Please select birth date and passport dates.');
+      return;
+    }
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final uid = await AuthService.instance.getUserId();
+      if (uid == null) {
+        throw Exception('Please log in again.');
       }
 
-      return StatefulBuilder(
-        builder: (context, setModalState) {
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+      final payload = {
+        'fullName': _nameC.text.trim(),
+        'relationship': _relationship,
+        'gender': _gender.isEmpty ? null : _gender,
+        'passportNo': _passportC.text.trim(),
+        'dob': _formatDate(_dob),
+        'passportIssueDate': _formatDate(_passportIssueDate),
+        'passportExpiryDate': _formatDate(_passportExpiryDate),
+        'nationality': _nationalityC.text.trim(),
+        'phone': _phoneC.text.trim(),
+      };
+
+      if (widget.initial == null) {
+        await _svc.add(
+          userId: uid,
+          fullName: payload['fullName'] as String,
+          relationship: payload['relationship'] as String,
+          gender: payload['gender'] as String?,
+          passportNo: payload['passportNo'] as String?,
+          dob: payload['dob'] as String?,
+          passportIssueDate: payload['passportIssueDate'] as String?,
+          passportExpiryDate: payload['passportExpiryDate'] as String?,
+          nationality: payload['nationality'] as String?,
+          phone: payload['phone'] as String?,
+        );
+      } else {
+        await _svc.update(
+          id: readInt(widget.initial!['id']),
+          userId: uid,
+          fullName: payload['fullName'] as String,
+          relationship: payload['relationship'] as String,
+          gender: payload['gender'] as String?,
+          passportNo: payload['passportNo'] as String?,
+          dob: payload['dob'] as String?,
+          passportIssueDate: payload['passportIssueDate'] as String?,
+          passportExpiryDate: payload['passportExpiryDate'] as String?,
+          nationality: payload['nationality'] as String?,
+          phone: payload['phone'] as String?,
+        );
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showSnack('Failed to save: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    widget.initial == null ? 'Add Family Member' : 'Edit Family Member',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          initial == null ? 'Add Family Member' : 'Edit Family Member',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: saving ? null : () => Navigator.of(sheetContext).pop(false),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: nameC,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Full name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: relationship,
-                      items: const [
-                        DropdownMenuItem(value: 'SPOUSE', child: Text('Spouse')),
-                        DropdownMenuItem(value: 'CHILD', child: Text('Child')),
-                        DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
-                        DropdownMenuItem(value: 'SIBLING', child: Text('Sibling')),
-                        DropdownMenuItem(value: 'FRIEND', child: Text('Friend')),
-                        DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-                      ],
-                      onChanged: saving ? null : (value) => setModalState(() => relationship = value ?? 'OTHER'),
-                      decoration: const InputDecoration(
-                        labelText: 'Relationship',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: (gender == 'male' || gender == 'female') ? gender : null,
-                      items: const [
-                        DropdownMenuItem(value: 'male', child: Text('Male')),
-                        DropdownMenuItem(value: 'female', child: Text('Female')),
-                      ],
-                      onChanged: saving ? null : (value) => setModalState(() => gender = value ?? ''),
-                      decoration: const InputDecoration(
-                        labelText: 'Gender',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _DateFieldRow(
-                      label: 'Date of Birth',
-                      value: dob,
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nameC,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Full name is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _relationship,
+                items: const [
+                  DropdownMenuItem(value: 'SPOUSE', child: Text('Spouse')),
+                  DropdownMenuItem(value: 'CHILD', child: Text('Child')),
+                  DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
+                  DropdownMenuItem(value: 'SIBLING', child: Text('Sibling')),
+                  DropdownMenuItem(value: 'FRIEND', child: Text('Friend')),
+                  DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                ],
+                onChanged: _saving ? null : (value) => setState(() => _relationship = value ?? 'OTHER'),
+                decoration: const InputDecoration(
+                  labelText: 'Relationship',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: (_gender == 'male' || _gender == 'female') ? _gender : null,
+                items: const [
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                ],
+                onChanged: _saving ? null : (value) => setState(() => _gender = value ?? ''),
+                decoration: const InputDecoration(
+                  labelText: 'Gender',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _DateFieldRow(
+                label: 'Date of Birth',
+                value: _dob,
+                onTap: () async {
+                  await _pickDate(
+                    current: _dob,
+                    first: DateTime(1900),
+                    last: DateTime.now(),
+                    onSelected: (date) => setState(() => _dob = date),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passportC,
+                decoration: const InputDecoration(
+                  labelText: 'Passport Number',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Passport number is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DateFieldRow(
+                      label: 'Passport Issue Date',
+                      value: _passportIssueDate,
                       onTap: () async {
-                        await pickDate(
-                          current: dob,
-                          first: DateTime(1900),
+                        await _pickDate(
+                          current: _passportIssueDate,
+                          first: DateTime(2000),
                           last: DateTime.now(),
-                          onSelected: (date) => setModalState(() => dob = date),
+                          onSelected: (date) => setState(() => _passportIssueDate = date),
                         );
                       },
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: passportC,
-                      decoration: const InputDecoration(
-                        labelText: 'Passport Number',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Passport number is required';
-                        }
-                        return null;
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DateFieldRow(
+                      label: 'Passport Expiry Date',
+                      value: _passportExpiryDate,
+                      onTap: () async {
+                        await _pickDate(
+                          current: _passportExpiryDate,
+                          first: _passportIssueDate ?? DateTime.now(),
+                          last: DateTime.now().add(const Duration(days: 365 * 10)),
+                          onSelected: (date) => setState(() => _passportExpiryDate = date),
+                        );
                       },
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DateFieldRow(
-                            label: 'Passport Issue Date',
-                            value: passportIssueDate,
-                            onTap: () async {
-                              await pickDate(
-                                current: passportIssueDate,
-                                first: DateTime(2000),
-                                last: DateTime.now(),
-                                onSelected: (date) =>
-                                    setModalState(() => passportIssueDate = date),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DateFieldRow(
-                            label: 'Passport Expiry Date',
-                            value: passportExpiryDate,
-                            onTap: () async {
-                              await pickDate(
-                                current: passportExpiryDate,
-                                first: passportIssueDate ?? DateTime.now(),
-                                last: DateTime.now().add(const Duration(days: 365 * 10)),
-                                onSelected: (date) =>
-                                    setModalState(() => passportExpiryDate = date),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: nationalityC,
-                      decoration: const InputDecoration(
-                        labelText: 'Nationality',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: phoneC,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton(
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              if (!formKey.currentState!.validate()) return;
-                              if (dob == null ||
-                                  passportIssueDate == null ||
-                                  passportExpiryDate == null) {
-                                ScaffoldMessenger.of(sheetContext).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please select birth date and passport dates.',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                              setModalState(() => saving = true);
-                              try {
-                                final uid = await AuthService.instance.getUserId();
-                                if (uid == null) {
-                                  throw Exception('Please log in again.');
-                                }
-
-                                if (initial == null) {
-                                  await svc.add(
-                                    userId: uid,
-                                    fullName: nameC.text.trim(),
-                                    relationship: relationship,
-                                    gender: gender.isEmpty ? null : gender,
-                                    passportNo: passportC.text.trim(),
-                                    dob: _formatDate(dob),
-                                    passportIssueDate: _formatDate(passportIssueDate),
-                                    passportExpiryDate: _formatDate(passportExpiryDate),
-                                    nationality: nationalityC.text.trim(),
-                                    phone: phoneC.text.trim(),
-                                  );
-                                } else {
-                                  await svc.update(
-                                    id: readInt(initial['id']),
-                                    userId: uid,
-                                    fullName: nameC.text.trim(),
-                                    relationship: relationship,
-                                    gender: gender.isEmpty ? null : gender,
-                                    passportNo: passportC.text.trim(),
-                                    dob: _formatDate(dob),
-                                    passportIssueDate: _formatDate(passportIssueDate),
-                                    passportExpiryDate: _formatDate(passportExpiryDate),
-                                    nationality: nationalityC.text.trim(),
-                                    phone: phoneC.text.trim(),
-                                  );
-                                }
-
-                                if (context.mounted) {
-                                  Navigator.of(sheetContext).pop(true);
-                                }
-                              } catch (e) {
-                                setModalState(() => saving = false);
-                                ScaffoldMessenger.of(sheetContext).showSnackBar(
-                                  SnackBar(content: Text('Failed to save: $e')),
-                                );
-                              }
-                            },
-                      child: saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(initial == null ? 'Save Member' : 'Save Changes'),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nationalityC,
+                decoration: const InputDecoration(
+                  labelText: 'Nationality',
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-
-  nameC.dispose();
-  nationalityC.dispose();
-  passportC.dispose();
-  phoneC.dispose();
-
-  return result == true;
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _phoneC,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(widget.initial == null ? 'Save Member' : 'Save Changes'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 String? _formatDate(DateTime? date) {
@@ -324,14 +355,15 @@ class _DateFieldRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 58,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: const BoxConstraints(minHeight: 58),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFD9DFE8)),
           color: Colors.white,
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(

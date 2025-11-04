@@ -3,115 +3,85 @@ import 'package:http/http.dart' as http;
 
 import '../config_service.dart';
 
+class ToyyibpayBill {
+  ToyyibpayBill({
+    required this.paymentUrl,
+    required this.paymentId,
+    required this.billCode,
+    required this.amount,
+  });
+
+  final Uri paymentUrl;
+  final int paymentId;
+  final String billCode;
+  final double amount;
+}
+
 class ToyyibpayService {
   ToyyibpayService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
 
-  Uri get _createBillUri =>
-      Uri.https(ConfigService.toyyibpayHost, '/index.php/api/createBill');
+  Uri _endpoint(String path) =>
+      Uri.parse('${ConfigService.apiBase}/$path');
 
-  Future<Uri> createBill({
+  Future<ToyyibpayBill> createBill({
+    required int bookingId,
     required double amount,
-    required String customerName,
-    required String customerEmail,
-    String? customerPhone,
-    String? reference,
     String? description,
+    String? customerPhone,
   }) async {
-    final sen = (amount * 100).round();
-    if (sen <= 0) {
-      throw ArgumentError('Amount must be greater than zero.');
-    }
-
-    final phone = _normalisePhone(customerPhone);
-    final body = <String, String>{
-      'userSecretKey': ConfigService.toyyibpaySecretKey,
-      'categoryCode': ConfigService.toyyibpayCategoryCode,
-      'billName': reference?.isNotEmpty == true
-          ? 'Booking $reference'
-          : 'Rotana Travel Booking',
-      'billDescription': description?.isNotEmpty == true
-          ? description!
-          : 'Booking payment',
-      'billAmount': sen.toString(),
-      'billReturnUrl': ConfigService.toyyibpayReturnUrl,
-      'billCallbackUrl': ConfigService.toyyibpayCallbackUrl,
-      'billTo': customerName,
-      'billEmail': customerEmail,
-      'billPhone': phone,
-      'billPayorInfo': '1',
-      'billPaymentChannel': '2',
-      'billChargeToCustomer': '1',
-      'billPriceSetting': '1',
-      if (reference != null && reference.isNotEmpty)
-        'billExternalReferenceNo': reference,
+    final body = {
+      'booking_id': bookingId,
+      'amount': amount,
+      if (description != null && description.isNotEmpty)
+        'bill_description': description,
+      if (customerPhone != null && customerPhone.isNotEmpty)
+        'customer_phone': customerPhone,
+      if (ConfigService.toyyibpayReturnUrl.isNotEmpty)
+        'return_url': ConfigService.toyyibpayReturnUrl,
+      if (ConfigService.toyyibpayCallbackUrl.isNotEmpty)
+        'callback_url': ConfigService.toyyibpayCallbackUrl,
     };
 
-    final res = await _postWithRedirect(
-      _createBillUri,
-      body,
+    final res = await _client.post(
+      _endpoint('toyyibpay_create_bill.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
     );
-
-    if (res.statusCode != 200) {
-      throw Exception('Toyyibpay error (HTTP ${res.statusCode})');
-    }
 
     final decoded = jsonDecode(res.body);
-    if (decoded is List && decoded.isNotEmpty) {
-      final first = decoded.first;
-      if (first is Map<String, dynamic>) {
-        final link = first['BillpaymentLink'] ??
-            first['billpaymentLink'] ??
-            first['Url'];
-        if (link is String && link.isNotEmpty) {
-          return Uri.parse(link);
-        }
-        final code = first['BillCode'] ?? first['billCode'];
-        if (code is String && code.isNotEmpty) {
-          return Uri.parse('${ConfigService.toyyibpayBaseUrl}/$code');
-        }
-        if (first['msg'] is String) {
-          throw Exception(first['msg']);
-        }
+    if (res.statusCode >= 200 &&
+        res.statusCode < 300 &&
+        decoded is Map<String, dynamic> &&
+        decoded['success'] == true) {
+      final data = Map<String, dynamic>.from(decoded['data'] as Map);
+      final url = data['payment_url']?.toString();
+      final billCode = data['bill_code']?.toString() ?? '';
+      final paymentId = int.tryParse(data['payment_id'].toString()) ?? 0;
+      final amt = double.tryParse(data['amount'].toString()) ?? amount;
+      if (url != null && url.isNotEmpty && paymentId > 0) {
+        return ToyyibpayBill(
+          paymentUrl: Uri.parse(url),
+          paymentId: paymentId,
+          billCode: billCode,
+          amount: amt,
+        );
       }
-    } else if (decoded is Map<String, dynamic>) {
-      final message = decoded['msg'] ?? decoded['message'] ?? decoded['error'];
-      if (message is String) {
-        throw Exception(message);
+      throw Exception('Toyyibpay bill response missing payment URL.');
+    }
+
+    if (decoded is Map<String, dynamic>) {
+      final error = decoded['error'] ?? decoded['message'];
+      final debug = decoded['debug'];
+      if (debug != null) {
+        return Future.error(
+          Exception('$error (debug: ${jsonEncode(debug)})'),
+        );
       }
+      throw Exception(error ?? 'Toyyibpay bill request failed (HTTP ${res.statusCode})');
     }
-    throw Exception('Failed to create Toyyibpay bill: ${res.body}');
-  }
 
-  Future<http.Response> _postWithRedirect(
-    Uri uri,
-    Map<String, String> body, {
-    int depth = 0,
-  }) async {
-    if (depth > 3) {
-      throw Exception('Toyyibpay error: too many redirects');
-    }
-    final res = await _client.post(
-      uri,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: body,
-    );
-    if (res.isRedirect || res.statusCode == 308) {
-      final location = res.headers['location'];
-      if (location == null || location.isEmpty) return res;
-      final nextUri = Uri.parse(location).isAbsolute
-          ? Uri.parse(location)
-          : uri.resolve(location);
-      return _postWithRedirect(nextUri, body, depth: depth + 1);
-    }
-    return res;
-  }
-
-  String _normalisePhone(String? phone) {
-    final digits = (phone ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
-    if (digits.isNotEmpty) return digits;
-    // Toyyibpay rejects empty phone numbers; fall back to a placeholder.
-    return '0000000000';
+    throw Exception('Toyyibpay bill request failed (HTTP ${res.statusCode})');
   }
 }

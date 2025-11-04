@@ -141,8 +141,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _StepIndicator(currentStep: 0, labels: const ['Travellers', 'Rooms', 'Payment', 'Confirm']),
-                const SizedBox(height: 24),
                 const Text(
                   'Add Travellers',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
@@ -684,107 +682,6 @@ class _DateField extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StepIndicator extends StatelessWidget {
-  final int currentStep;
-  final List<String> labels;
-
-  const _StepIndicator({required this.currentStep, required this.labels});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: labels.asMap().entries.map((entry) {
-        final index = entry.key;
-        final label = entry.value;
-        final isActive = index == currentStep;
-        final isCompleted = index < currentStep;
-        return Expanded(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  if (index != 0)
-                    Expanded(
-                      child: Container(
-                        height: 2,
-                        color: isCompleted ? const Color(0xFF0E8AE8) : const Color(0xFFE0E6EF),
-                      ),
-                    ),
-                  _StepCircle(
-                    index: index + 1,
-                    active: isActive,
-                    completed: isCompleted,
-                  ),
-                  if (index != labels.length - 1)
-                    Expanded(
-                      child: Container(
-                        height: 2,
-                        color: index < currentStep ? const Color(0xFF0E8AE8) : const Color(0xFFE0E6EF),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive ? const Color(0xFF0E8AE8) : Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _StepCircle extends StatelessWidget {
-  final int index;
-  final bool active;
-  final bool completed;
-
-  const _StepCircle({
-    required this.index,
-    required this.active,
-    required this.completed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Color background;
-    Color textColor;
-    if (completed) {
-      background = const Color(0xFF0E8AE8);
-      textColor = Colors.white;
-    } else if (active) {
-      background = const Color(0xFF0E8AE8);
-      textColor = Colors.white;
-    } else {
-      background = Colors.white;
-      textColor = Colors.black54;
-    }
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: completed || active ? const Color(0xFF0E8AE8) : const Color(0xFFE0E6EF)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$index',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          color: textColor,
-        ),
-      ),
     );
   }
 }

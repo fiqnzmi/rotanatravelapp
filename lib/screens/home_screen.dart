@@ -930,45 +930,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         onRefresh: _load,
                       ),
                     ],
-                    const SizedBox(height: 22),
-                    Row(children: [
-                      Text('Special Offers',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      const Spacer(),
-                      TextButton(
-                          onPressed: () {}, child: const Text('View All')),
-                    ]),
-                    const SizedBox(height: 8),
-                    _offerCard(
-                      context,
-                      title: 'Umrah Package Promo',
-                      subtitle: 'Early Bird — save up to RM 2,000',
-                      price: 4990,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const PackageDetailScreen(packageId: 1),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _offerCard(
-                      context,
-                      title: 'Hajj Premium',
-                      subtitle: 'Limited seats — new season',
-                      price: 22990,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const PackageDetailScreen(packageId: 1),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),

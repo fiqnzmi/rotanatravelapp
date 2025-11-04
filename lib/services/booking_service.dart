@@ -1,6 +1,7 @@
 import '../models/booking.dart';
 import '../utils/json_utils.dart';
 import 'api_client.dart';
+import 'auth_service.dart';
 
 class BookingService {
   final _api = ApiClient();
@@ -10,7 +11,9 @@ class BookingService {
   }
 
   Future<List<Booking>> myBookings() async {
-    final list = await _api.get('my_bookings.php'); // your PHP should infer user from session or pass user_id
+    final userId = await AuthService.instance.getUserId();
+    final query = userId != null ? {'user_id': '$userId'} : null;
+    final list = await _api.get('my_bookings.php', query: query);
     final arr = (list as List? ?? [])
         .whereType<Map<String, dynamic>>()
         .map((m) => Map<String, dynamic>.from(m))
@@ -19,7 +22,12 @@ class BookingService {
   }
 
   Future<int> createBooking(Map<String, dynamic> payload) async {
-    final data = await _api.post('create_booking.php', payload);
+    final userId = await AuthService.instance.getUserId();
+    if (userId == null) {
+      throw Exception('Please log in before making a booking.');
+    }
+    final body = Map<String, dynamic>.from(payload)..['user_id'] = userId;
+    final data = await _api.post('create_booking.php', body);
     return readInt(data['id']);
   }
 
