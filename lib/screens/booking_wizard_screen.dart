@@ -534,6 +534,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       passportIssueDate: issue,
       passportExpiryDate: expiry,
       isChild: isChildSlot,
+      familyMemberId: readIntOrNull(f['id']),
     );
   }
 

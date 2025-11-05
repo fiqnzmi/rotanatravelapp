@@ -560,24 +560,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _statusChip(
     IconData icon,
     String label, {
-    Color background = const Color(0xFFE9EDF2),
-    Color iconColor = Colors.black87,
-    Color textColor = Colors.black87,
+    Color? background,
+    Color? iconColor,
+    Color? textColor,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bg = background ?? scheme.surfaceVariant.withOpacity(0.65);
+    final iconClr = iconColor ?? scheme.onSurfaceVariant;
+    final textClr = textColor ?? scheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: background,
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 16, color: iconColor),
+        Icon(icon, size: 16, color: iconClr),
         const SizedBox(width: 6),
         Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: textColor,
+            color: textClr,
           ),
         ),
       ]),
@@ -589,6 +594,10 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = scheme.onSurfaceVariant;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -597,13 +606,21 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: const Color(0xFFE9EDF2),
+            color: isDark
+                ? scheme.surfaceVariant.withOpacity(0.35)
+                : scheme.surfaceVariant,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(icon, size: 28),
+          child: Icon(icon, size: 28, color: iconColor),
         ),
         const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurface,
+          ),
+        ),
       ]),
     );
   }
@@ -796,8 +813,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final helloName = _userName?.isNotEmpty == true ? _userName! : 'Guest';
     final nextTrip = _nextTrip;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: scheme.background,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -855,7 +876,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: theme.cardColor,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: const [
                           BoxShadow(
@@ -869,20 +890,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Sacred Journey Awaits',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
+                              style: theme.textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w700)),
                           const SizedBox(height: 6),
                           Text('Experience the spiritual journey of a lifetime',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(color: Colors.black54)),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurface.withOpacity(0.6),
+                              )),
                           const SizedBox(height: 18),
                           Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF5F7FA),
+                              color: isDark
+                                  ? scheme.surfaceVariant.withOpacity(0.35)
+                                  : scheme.surfaceVariant,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             padding: const EdgeInsets.all(14),
@@ -893,9 +913,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 18),
                     Text('Quick Actions',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 12),
                     Row(

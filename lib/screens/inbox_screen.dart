@@ -35,7 +35,10 @@ class _InboxScreenState extends State<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
+      backgroundColor: scheme.background,
       appBar: AppBar(title: const Text('Inbox'), actions: [IconButton(onPressed: (){}, icon: const Icon(Icons.more_vert))]),
       body: FutureBuilder(
         future: _future,
@@ -67,20 +70,31 @@ class _InboxScreenState extends State<InboxScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (_, i) {
               final m = items[i];
+              final type = (m['type'] ?? '').toString().toUpperCase();
+              final iconData = type == 'PAYMENT'
+                  ? Icons.payments_outlined
+                  : type == 'DOCS'
+                      ? Icons.insert_drive_file_outlined
+                      : type == 'BRIEFING'
+                          ? Icons.record_voice_over_outlined
+                          : type == 'BOOKING'
+                              ? Icons.bookmark_added_outlined
+                              : type == 'PROMO'
+                                  ? Icons.local_offer_outlined
+                                  : Icons.notifications_outlined;
               return Card(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
-                  leading: Icon(
-                    m['type']=='PAYMENT' ? Icons.payments_outlined :
-                    m['type']=='DOCS'    ? Icons.insert_drive_file_outlined :
-                    m['type']=='BRIEFING'? Icons.record_voice_over_outlined :
-                    m['type']=='BOOKING' ? Icons.bookmark_added_outlined :
-                    m['type']=='PROMO'   ? Icons.local_offer_outlined :
-                                           Icons.notifications_outlined,
+                  leading: Icon(iconData, color: scheme.primary),
+                  title: Text(m['title'] ?? '', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    m['body'] ?? '',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
-                  title: Text(m['title'] ?? ''),
-                  subtitle: Text(m['body'] ?? ''),
-                  trailing: Text(m['created_at'].toString().split(' ').first),
+                  trailing: Text(
+                    m['created_at'].toString().split(' ').first,
+                    style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
                 ),
               );
             },
@@ -103,27 +117,26 @@ class _InboxLoginPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          const Icon(Icons.notifications_none_outlined,
-              size: 72, color: Colors.grey),
+          Icon(Icons.notifications_none_outlined,
+              size: 72, color: scheme.onSurfaceVariant),
           const SizedBox(height: 20),
           Text(
             'Stay updated',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Log in to see your latest travel alerts and updates.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54),
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           FilledButton(

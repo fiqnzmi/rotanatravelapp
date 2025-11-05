@@ -30,8 +30,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final money = NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 0);
     return Scaffold(
+      backgroundColor: scheme.background,
       appBar: AppBar(
         title: const Text('Packages'),
         actions: [
@@ -53,9 +56,9 @@ class _PackagesScreenState extends State<PackagesScreen> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
-                  _chip('All Months', selected: true), const SizedBox(width: 8),
-                  _chip('Price Range'), const SizedBox(width: 8),
-                  _chip('Room Size'), const SizedBox(width: 8),
+                  _chip(context, 'All Months', selected: true), const SizedBox(width: 8),
+                  _chip(context, 'Price Range'), const SizedBox(width: 8),
+                  _chip(context, 'Room Size'), const SizedBox(width: 8),
                 ]),
               ),
               const SizedBox(height: 12),
@@ -66,7 +69,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 18),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: theme.cardColor,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: const [BoxShadow(color: Color(0x15000000), blurRadius: 18, offset: Offset(0, 8))],
                   ),
@@ -77,7 +80,10 @@ class _PackagesScreenState extends State<PackagesScreen> {
                         aspectRatio: 16 / 9,
                         child: (p.coverImage != null)
                             ? Image.network(p.coverImage!, fit: BoxFit.cover)
-                            : Container(color: const Color(0xFFE9EDF2), child: const Center(child: Icon(Icons.image_outlined, size: 48))),
+                            : Container(
+                                color: scheme.surfaceVariant.withOpacity(0.6),
+                                child: Icon(Icons.image_outlined, size: 48, color: scheme.onSurfaceVariant),
+                              ),
                       ),
                     ),
                     Padding(
@@ -94,7 +100,10 @@ class _PackagesScreenState extends State<PackagesScreen> {
                         ]),
                         const SizedBox(height: 4),
                         if (subtitle.isNotEmpty)
-                          Text(subtitle, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+                          Text(
+                            subtitle,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
                         const SizedBox(height: 12),
                         if ((p.hotelStars ?? 0) >= 5) ...[const PremiumChip(), const SizedBox(height: 12)],
                         Row(children: [
@@ -124,16 +133,23 @@ class _PackagesScreenState extends State<PackagesScreen> {
     );
   }
 
-  Widget _chip(String label, {bool selected = false}) {
+  Widget _chip(BuildContext context, String label, {bool selected = false}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFF3B82F6) : Colors.white,
+        color: selected ? scheme.primary : scheme.surfaceVariant.withOpacity(0.7),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE3E8EF)),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(0.6)),
       ),
-      child: Text(label,
-          style: TextStyle(color: selected ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: selected ? scheme.onPrimary : scheme.onSurface,
+        ),
+      ),
     );
   }
 }

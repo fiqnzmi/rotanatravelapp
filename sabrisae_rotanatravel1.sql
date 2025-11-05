@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Nov 03, 2025 at 11:57 AM
+-- Generation Time: Nov 05, 2025 at 04:02 AM
 -- Server version: 5.7.44-cll-lve
 -- PHP Version: 8.2.29
 
@@ -48,18 +48,10 @@ CREATE TABLE `bookings` (
 --
 
 INSERT INTO `bookings` (`id`, `user_id`, `package_id`, `adults`, `children`, `status`, `created_at`, `departure_date`, `room_tier`, `deposit_paid`, `briefing_done`, `final_paid`, `total_amount`) VALUES
-(2, 1, 1, 1, 0, 'CONFIRMED', '2025-10-23 14:57:21', NULL, NULL, 0, 0, 0, 1.00),
-(3, 1, 1, 1, 0, 'CONFIRMED', '2025-10-23 14:57:43', NULL, NULL, 0, 0, 0, 1.00),
-(4, 1, 1, 1, 0, 'CONFIRMED', '2025-10-23 15:58:44', NULL, NULL, 0, 0, 0, 1.00),
-(5, 1, 6, 1, 0, 'CONFIRMED', '2025-10-24 13:13:02', NULL, NULL, 0, 0, 0, 2.00),
-(6, 1, 6, 2, 0, 'CONFIRMED', '2025-10-24 16:49:39', NULL, NULL, 0, 0, 0, 4.00),
-(7, 1, 6, 1, 0, 'CONFIRMED', '2025-10-24 19:28:15', NULL, NULL, 0, 0, 0, 2.00),
-(8, 1, 1, 1, 0, 'CONFIRMED', '2025-10-28 23:20:51', NULL, NULL, 0, 0, 0, 1.00),
-(9, 1, 6, 1, 0, 'CONFIRMED', '2025-10-28 23:24:21', NULL, NULL, 0, 0, 0, 2.00),
-(10, 1, 6, 1, 0, 'CONFIRMED', '2025-10-28 23:25:00', NULL, NULL, 0, 0, 0, 2.00),
-(11, 1, 6, 1, 0, 'CONFIRMED', '2025-10-29 10:46:36', NULL, NULL, 0, 0, 0, 2.00),
-(12, 1, 6, 1, 0, 'CONFIRMED', '2025-10-29 11:32:39', NULL, NULL, 0, 0, 0, 2.00),
-(13, 1, 7, 1, 0, 'CONFIRMED', '2025-11-03 09:19:21', NULL, NULL, 0, 0, 0, 2.00);
+(16, 6, 7, 1, 0, 'CONFIRMED', '2025-11-04 19:24:50', NULL, NULL, 0, 0, 0, 2.00),
+(17, 9, 1, 1, 0, 'CONFIRMED', '2025-11-05 00:43:22', NULL, NULL, 0, 0, 0, 0.00),
+(18, 5, 7, 1, 0, 'CONFIRMED', '2025-11-05 03:41:53', NULL, NULL, 0, 0, 0, 2.00),
+(19, 5, 6, 1, 0, 'CONFIRMED', '2025-11-05 10:25:08', NULL, NULL, 0, 0, 0, 2.00);
 
 -- --------------------------------------------------------
 
@@ -83,19 +75,9 @@ CREATE TABLE `booking_travellers` (
 --
 
 INSERT INTO `booking_travellers` (`id`, `booking_id`, `full_name`, `passport_no`, `dob`, `gender`, `passport_issue_date`, `passport_expiry_date`) VALUES
-(1, 2, 'Test User', 'shfj3874', '1995-10-23', 'Male', '2024-10-23', '2030-10-22'),
-(2, 3, 'Muhammad Afiq Nazmi', 'shfjj3874', '1995-10-23', 'male', NULL, NULL),
-(3, 4, 'Afiq', '244fggdf', '1995-10-17', 'male', NULL, NULL),
-(4, 5, 'afiq', '123abc', '1995-10-24', 'male', NULL, NULL),
-(5, 6, 'Yamin', 'abc123', '1995-10-24', 'male', NULL, NULL),
-(6, 6, 'Wafiy', 'atv231', '1995-10-26', 'male', NULL, NULL),
-(7, 7, 'Amier Hamzah', 'yter223', '1995-10-24', 'male', NULL, NULL),
-(8, 8, 'Assyabil Yamin', 'A123', '1995-10-28', 'male', NULL, NULL),
-(9, 9, 'Amirr', 'a123', '1995-10-28', 'male', NULL, NULL),
-(10, 10, 'Amier', 'a1223', '1995-10-28', 'male', NULL, NULL),
-(11, 11, 'Amier', 'abc123', '1995-10-29', 'male', NULL, NULL),
-(12, 12, 'Amier', '12345679', '1995-10-29', 'male', NULL, NULL),
-(13, 13, 'Assyabil', 'abc123456', '1995-11-03', 'male', NULL, NULL);
+(16, 16, 'Eryschia', 'abc123', '1995-11-04', 'female', NULL, NULL),
+(17, 18, 'Muhammad Afiq Nazmi Bin Sulaiman', 'a123', '1995-11-05', 'male', NULL, NULL),
+(18, 19, 'Muhammad Farhan Bin Mohd Fahimy', 'a123', '2003-06-11', 'male', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -123,21 +105,16 @@ CREATE TABLE `documents` (
 --
 
 INSERT INTO `documents` (`id`, `user_id`, `booking_id`, `traveller_id`, `doc_type`, `file_path`, `file_name`, `mime_type`, `status`, `uploaded_at`, `label`, `remarks`) VALUES
-(1, 7, 7, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-10-28 13:36:09', 'Passport', NULL),
-(2, 7, 7, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-10-28 13:36:09', 'Travel Insurance', NULL),
-(3, 7, 7, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-10-28 13:36:09', 'Visa', NULL),
-(4, 7, 7, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-10-28 13:36:09', 'Payment Proof', NULL),
-(5, 7, 7, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-10-28 13:36:09', 'Additional Document', NULL),
-(6, 5, 12, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-10-29 16:15:34', 'Passport', NULL),
-(7, 5, 12, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-10-29 16:15:34', 'Travel Insurance', NULL),
-(8, 5, 12, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-10-29 16:15:34', 'Visa', NULL),
-(9, 5, 12, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-10-29 16:15:34', 'Payment Proof', NULL),
-(10, 5, 12, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-10-29 16:15:34', 'Additional Document', NULL),
-(11, 8, 2, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-10-31 10:35:39', 'Passport', NULL),
-(12, 8, 2, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-10-31 10:35:39', 'Travel Insurance', NULL),
-(13, 8, 2, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-10-31 10:35:39', 'Visa', NULL),
-(14, 8, 2, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-10-31 10:35:39', 'Payment Proof', NULL),
-(15, 8, 2, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-10-31 10:35:39', 'Additional Document', NULL);
+(1, 5, 18, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Passport', NULL),
+(2, 5, 18, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Travel Insurance', NULL),
+(3, 5, 18, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Visa', NULL),
+(4, 5, 18, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Payment Proof', NULL),
+(5, 5, 18, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Additional Document', NULL),
+(6, 5, 19, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Passport', NULL),
+(7, 5, 19, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Travel Insurance', NULL),
+(8, 5, 19, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Visa', NULL),
+(9, 5, 19, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Payment Proof', NULL),
+(10, 5, 19, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Additional Document', NULL);
 
 -- --------------------------------------------------------
 
@@ -160,6 +137,14 @@ CREATE TABLE `family_members` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `family_members`
+--
+
+INSERT INTO `family_members` (`id`, `user_id`, `full_name`, `relationship`, `gender`, `passport_no`, `dob`, `passport_issue_date`, `passport_expiry_date`, `nationality`, `phone`, `created_at`) VALUES
+(1, 5, 'Muhammad Farhan Bin Mohd Fahimy', 'FRIEND', 'male', 'a123', '2003-06-11', '2025-11-04', '2030-11-04', 'Malaysia', '01110742871', '2025-11-04 20:16:47'),
+(2, 5, 'Muhammad Ammar Syahmi Bin Sulaiman', 'SIBLING', 'male', 'a345', '2025-11-05', '2024-11-05', '2030-11-05', 'Malaysia', '01137136259', '2025-11-05 10:20:20');
+
 -- --------------------------------------------------------
 
 --
@@ -175,21 +160,6 @@ CREATE TABLE `notifications` (
   `is_important` tinyint(1) NOT NULL DEFAULT '0',
   `is_read` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `password_resets`
---
-
-CREATE TABLE `password_resets` (
-  `id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `token` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `used_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -231,6 +201,35 @@ INSERT INTO `packages` (`id`, `title`, `description`, `price`, `images_json`, `b
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `password_resets`
+--
+
+CREATE TABLE `password_resets` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `token` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `used_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `password_resets`
+--
+
+INSERT INTO `password_resets` (`id`, `user_id`, `token`, `code`, `created_at`, `used_at`) VALUES
+(1, 6, '1bfa83f5b3b8fede0707be646177a8b0', '927163', '2025-11-03 16:00:07', NULL),
+(2, 6, '7543b9a5e29ab87a6fe516671c4b986f', '362020', '2025-11-03 16:13:03', NULL),
+(3, 6, '56c1df979bfdc46afa6c79a1cd462a18', '927960', '2025-11-03 16:23:09', NULL),
+(4, 6, 'be4b7cbd03b8e31059e421757d1e4b3c', '918360', '2025-11-03 16:23:34', NULL),
+(5, 6, '8a7ce760005be243eeb469f9021565c4', '554459', '2025-11-03 17:05:18', NULL),
+(6, 6, '8b0a58b7db6dff097e1a7912ecae8483', '749458', '2025-11-03 17:09:56', NULL),
+(7, 6, '35e44f2c8dc72b245f8cb0e263999e52', '227858', '2025-11-04 01:20:37', '2025-11-04 01:22:08'),
+(8, 7, '3759ffd430258a9f732bf957eceba5b1', '569695', '2025-11-04 12:09:22', '2025-11-04 12:10:17');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `payments`
 --
 
@@ -252,13 +251,8 @@ CREATE TABLE `payments` (
 --
 
 INSERT INTO `payments` (`id`, `booking_id`, `amount`, `currency`, `method`, `status`, `transaction_ref`, `gateway_payload`, `paid_at`, `created_at`) VALUES
-(2, 7, 2.00, 'MYR', 'FPX', 'PAID', 'TP2510241059440121', NULL, '2025-10-24 22:10:44', '2025-10-24 22:10:43'),
-(3, 6, 4.00, 'MYR', 'FPX', 'PAID', 'TP2510272507006432', NULL, '2025-10-27 21:33:07', '2025-10-27 21:33:07'),
-(4, 3, 1.00, 'MYR', 'FPX', 'PAID', 'TP2510284804408329', NULL, '2025-10-28 13:30:28', '2025-10-28 13:30:28'),
-(5, 9, 2.00, 'MYR', 'FPX', 'PAID', 'TP2510284224074047', NULL, '2025-10-28 23:54:35', '2025-10-28 23:54:35'),
-(6, 10, 2.00, 'MYR', 'FPX', 'PAID', 'TP2510291655455896', NULL, '2025-10-29 07:40:23', '2025-10-29 07:40:22'),
-(7, 8, 1.00, 'MYR', 'FPX', 'PAID', 'TP2510292779036563', NULL, '2025-10-29 11:00:59', '2025-10-29 11:00:59'),
-(8, 12, 2.00, 'MYR', 'FPX', 'PAID', 'TP2510290565813249', NULL, '2025-10-29 11:34:53', '2025-10-29 11:34:53');
+(1, 18, 2.00, 'MYR', 'FPX', 'PENDING', 'ml4kztik', '{\"bill\": {\"BillCode\": \"ml4kztik\"}, \"request\": {\"amount\": 2, \"external_ref\": \"BOOK-18-1762285319\", \"customer_name\": \"Muhammad Afiq\", \"customer_email\": \"muhammadafiqnazmi2003@gmail.com\", \"customer_phone\": \"01135363010\"}}', NULL, '2025-11-05 03:42:00'),
+(2, 18, 2.00, 'MYR', 'FPX', 'PENDING', 'fnlemn05', '{\"bill\": {\"BillCode\": \"fnlemn05\"}, \"request\": {\"amount\": 2, \"external_ref\": \"BOOK-18-1762285350\", \"customer_name\": \"Muhammad Afiq\", \"customer_email\": \"muhammadafiqnazmi2003@gmail.com\", \"customer_phone\": \"01135363010\"}}', NULL, '2025-11-05 03:42:31');
 
 -- --------------------------------------------------------
 
@@ -332,8 +326,8 @@ INSERT INTO `users` (`id`, `username`, `name`, `email`, `password_hash`, `phone`
 (1, 'afiq', 'afiq', 'afiq@example.com', '$2y$10$rezod81V4ILNsK3Cmf11Feo8FlRqmO6Pb.0JXJY9udBNJ2QwBUXPi', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:41:58'),
 (4, 'afiq2', 'afiq2', 'afiq2@example.com', '$2y$10$m/seoYYNQXgY0UFjEAz0a.TtB5qiaSp0CtebZ46PlsMWEjnezdYoO', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:08'),
 (5, 'Muhammad Afiq', 'Muhammad Afiq', 'muhammadafiqnazmi2003@gmail.com', '$2y$10$2Q6Q9BGIS8HeUUf4.SF3IOKwgrM8Z4ntBEgI/N.Mmq7KASLx1CfdG', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:42'),
-(6, 'Assyabil', 'Assyabil', 'abilkry@gmail.com', '$2y$10$CscMeP.eMtl/r99i8dvdNOaqIQp3ik3La25glVYXIPJkDKxWuTpQq', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-24 16:50:11'),
-(7, 'Afiq Nazmi', 'Afiq Nazmi', 'afiqnazmi17@icloud.com', '$2y$10$zl4WiRFuafe11zv9HP3vJuG3Kto8jWgjxRC7IsT7Qo4ldxRiw8xya', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-27 23:17:12'),
+(6, 'Assyabil', 'Assyabil', 'abilkry@gmail.com', '$2y$10$NIFNXbGErITAFUcPai68se7PQHsLa/7AlrFoqmLagnAfSkb2ka8Uu', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-24 16:50:11'),
+(7, 'Afiq Nazmi', 'Afiq Nazmi', 'afiqnazmi17@icloud.com', '$2y$10$ymq6UL58EOS74ZLCgBlwx.Z3/2Cw3mnEaKqkEe6vo2KM/WEOHJFG2', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-27 23:17:12'),
 (8, 'Muhammad Afiq Nazmi Bin Sulaiman', 'Muhammad Afiq Nazmi Bin Sulaiman', 'afiqnzmi@gmail.com', '$2y$10$ihYrNLR5FYFh.bcv9Upk8.FLsrwibO4p4I0cU6DrUcuDTQIo3iCVS', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-28 23:05:49'),
 (9, 'Amier', 'Amier', 'cuteamier@gmail.com', '$2y$10$HMLA4GaC2uS/Tbe10gIPFuJ.R.DdLH2LYxNeBM3Aq42fIt7SHad.2', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-29 10:45:52');
 
@@ -390,6 +384,13 @@ ALTER TABLE `notifications`
   ADD KEY `created_at` (`created_at`);
 
 --
+-- Indexes for table `packages`
+--
+ALTER TABLE `packages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `title` (`title`);
+
+--
 -- Indexes for table `password_resets`
 --
 ALTER TABLE `password_resets`
@@ -397,13 +398,6 @@ ALTER TABLE `password_resets`
   ADD UNIQUE KEY `uq_token` (`token`),
   ADD KEY `user_id` (`user_id`),
   ADD KEY `code` (`code`);
-
---
--- Indexes for table `packages`
---
-ALTER TABLE `packages`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `title` (`title`);
 
 --
 -- Indexes for table `payments`
@@ -446,36 +440,30 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `bookings`
 --
 ALTER TABLE `bookings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `booking_travellers`
 --
 ALTER TABLE `booking_travellers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `documents`
 --
 ALTER TABLE `documents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `family_members`
 --
 ALTER TABLE `family_members`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `password_resets`
---
-ALTER TABLE `password_resets`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -485,10 +473,16 @@ ALTER TABLE `packages`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
+-- AUTO_INCREMENT for table `password_resets`
+--
+ALTER TABLE `password_resets`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `role`
@@ -511,6 +505,12 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_emergency_contact` FOREIGN KEY (`emergency_contact_id`) REFERENCES `family_members` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `bookings`

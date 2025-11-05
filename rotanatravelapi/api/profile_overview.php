@@ -6,8 +6,23 @@ if ($userId<=0) {
   $userId = 1;
 }
 $pdo = db();
-$user = $pdo->prepare("SELECT id, username, name, email FROM users WHERE id=?");
+$user = $pdo->prepare("SELECT id, username, name, email, phone, notify_email, notify_sms, preferred_language, emergency_contact_id, profile_photo, profile_photo_url FROM users WHERE id=?");
 $user->execute([$userId]); $u = $user->fetch();
+
+if ($u) {
+  $photoUrl = $u['profile_photo_url'] ?? null;
+  if (!$photoUrl && !empty($u['profile_photo'])) {
+    $photoUrl = $u['profile_photo'];
+  }
+  $u['photo'] = $photoUrl;
+  $u['photo_url'] = $photoUrl;
+  $u['notify_email'] = isset($u['notify_email']) ? (int)$u['notify_email'] : 1;
+  $u['notify_sms'] = isset($u['notify_sms']) ? (int)$u['notify_sms'] : 0;
+  $u['language'] = $u['preferred_language'] ?: null;
+  if (!isset($u['phone'])) {
+    $u['phone'] = null;
+  }
+}
 
 $counts = [
   'completed' => (int)$pdo->query("SELECT COUNT(*) c FROM bookings WHERE user_id=$userId AND status='COMPLETED'")->fetch()['c'],
@@ -18,4 +33,11 @@ $counts = [
 $members = $pdo->prepare("SELECT id, full_name, relationship FROM family_members WHERE user_id=? ORDER BY id DESC LIMIT 10");
 $members->execute([$userId]); $m = $members->fetchAll();
 
-ok(['user'=>$u, 'counts'=>$counts, 'family_members'=>$m]);
+$emergency = null;
+if ($u && !empty($u['emergency_contact_id'])) {
+  $em = $pdo->prepare("SELECT id, full_name, relationship, phone FROM family_members WHERE id=? AND user_id=? LIMIT 1");
+  $em->execute([(int)$u['emergency_contact_id'], $userId]);
+  $emergency = $em->fetch() ?: null;
+}
+
+ok(['user'=>$u, 'counts'=>$counts, 'family_members'=>$m, 'emergency_contact'=>$emergency]);

@@ -38,6 +38,21 @@ function normalize_date_value($value) {
   if ($value instanceof DateTimeInterface) return $value->format('Y-m-d');
   $text = trim((string)$value);
   if ($text === '') return null;
+
+  // Try common date formats explicitly before falling back to strtotime.
+  $formats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'm/d/Y', 'm-d-Y', 'Y/m/d'];
+  foreach ($formats as $format) {
+    $dt = DateTime::createFromFormat($format, $text);
+    if ($dt instanceof DateTime) {
+      $errors = DateTime::getLastErrors();
+      $warningCount = is_array($errors) ? ($errors['warning_count'] ?? 0) : 0;
+      $errorCount = is_array($errors) ? ($errors['error_count'] ?? 0) : 0;
+      if ($warningCount === 0 && $errorCount === 0) {
+        return $dt->format('Y-m-d');
+      }
+    }
+  }
+
   $ts = strtotime($text);
   return $ts === false ? null : date('Y-m-d', $ts);
 }
@@ -53,6 +68,40 @@ function normalize_relationship_value($value) {
   $allowed = ['SPOUSE','CHILD','PARENT','SIBLING','FRIEND','OTHER'];
   $upper = strtoupper(trim((string)$value));
   return in_array($upper, $allowed, true) ? $upper : 'OTHER';
+}
+
+function normalize_key_identifier(string $key): string {
+  return preg_replace('/[^a-z0-9]/', '', strtolower($key));
+}
+
+function build_normalized_key_map(array $row): array {
+  $map = [];
+  foreach ($row as $key => $value) {
+    if (!is_string($key)) continue;
+    $map[normalize_key_identifier($key)] = $value;
+  }
+  return $map;
+}
+
+function array_pick_value(array $row, array $normalizedMap, array $candidates, bool $trim = true) {
+  foreach ($candidates as $candidate) {
+    $value = null;
+    if (is_string($candidate) && array_key_exists($candidate, $row)) {
+      $value = $row[$candidate];
+    } else {
+      $normalizedKey = normalize_key_identifier((string)$candidate);
+      if (array_key_exists($normalizedKey, $normalizedMap)) {
+        $value = $normalizedMap[$normalizedKey];
+      }
+    }
+    if ($value === null) continue;
+    if ($trim && is_string($value)) {
+      $value = trim($value);
+      if ($value === '') continue;
+    }
+    return $value;
+  }
+  return null;
 }
 
 function db_column_exists(PDO $pdo, string $table, string $column) {

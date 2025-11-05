@@ -36,19 +36,36 @@ class _TripsScreenState extends State<TripsScreen> {
     return _TripsResult(loggedIn: true, bookings: bookings);
   }
 
-  Widget _stepsBar(List<Map<String, dynamic>> steps) {
+  Widget _stepsBar(BuildContext context, List<Map<String, dynamic>> steps) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final done = steps.where((s) => s['done'] == true).length;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Progress: $done of ${steps.length} steps completed', style: const TextStyle(fontWeight: FontWeight.w600)),
+      Text(
+        'Progress: $done of ${steps.length} steps completed',
+        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
       const SizedBox(height: 6),
-      LinearProgressIndicator(value: done / steps.length),
+      LinearProgressIndicator(
+        value: steps.isEmpty ? 0 : done / steps.length,
+        backgroundColor: scheme.surfaceVariant.withOpacity(0.6),
+        valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+        minHeight: 6,
+      ),
       const SizedBox(height: 8),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: steps.map((s) {
         final ok = s['done'] == true;
         return Column(children: [
-          Icon(ok ? Icons.check_circle : Icons.radio_button_unchecked, size: 18, color: ok ? Colors.green : Colors.grey),
+          Icon(
+            ok ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 18,
+            color: ok ? scheme.primary : scheme.outlineVariant,
+          ),
           const SizedBox(height: 4),
-          Text(s['label'], style: const TextStyle(fontSize: 12)),
+          Text(
+            s['label'],
+            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
         ]);
       }).toList()),
     ]);
@@ -101,9 +118,12 @@ class _TripsScreenState extends State<TripsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: scheme.background,
         appBar: AppBar(title: const Text('My Trips'), bottom: const TabBar(tabs: [Tab(text: 'Upcoming'), Tab(text: 'Past')]),
             actions: [IconButton(onPressed: (){}, icon: const Icon(Icons.search))]),
         body: FutureBuilder(
@@ -153,7 +173,10 @@ class _TripsScreenState extends State<TripsScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(b.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
-              const Text('Departure: —', style: TextStyle(color: Colors.black54)),
+              Text(
+                'Departure: —',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 10),
               FutureBuilder(
                 future: AuthService.instance.getUserId().then((uid)=>_dash.bookingSummary(b.id, uid ?? 0)),
@@ -161,7 +184,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator(minHeight: 6);
                   if (snap.hasError) return const SizedBox.shrink();
                   final steps = (snap.data!['steps'] as List).cast<Map<String,dynamic>>();
-                  return _stepsBar(steps);
+                  return _stepsBar(context, steps);
                 },
               ),
               const SizedBox(height: 10),

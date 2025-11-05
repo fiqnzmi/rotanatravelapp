@@ -8,6 +8,7 @@ class Traveller {
   DateTime? passportIssueDate;
   DateTime? passportExpiryDate;
   bool isChild;
+  int? familyMemberId;
 
   Traveller({
     this.fullName = '',
@@ -17,6 +18,7 @@ class Traveller {
     this.passportIssueDate,
     this.passportExpiryDate,
     this.isChild = false,
+    this.familyMemberId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -27,6 +29,8 @@ class Traveller {
         'passport_issue_date': _format(passportIssueDate),
         'passport_expiry_date': _format(passportExpiryDate),
         'type': isChild ? 'child' : 'adult',
+        'family_member_id': familyMemberId,
+        'familyMemberId': familyMemberId,
       };
 
   static String? _format(DateTime? dt) =>

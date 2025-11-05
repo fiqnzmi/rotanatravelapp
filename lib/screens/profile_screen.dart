@@ -10,6 +10,11 @@ import '../services/family_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'family_members_screen.dart';
+import 'notification_settings_screen.dart';
+import 'payment_methods_screen.dart';
+import 'privacy_security_screen.dart';
+import 'help_support_screen.dart';
+import 'about_rotana_screen.dart';
 
 DateTime? _parseDate(dynamic value) {
   if (value == null) return null;
@@ -29,8 +34,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _family = FamilyService();
   final ImagePicker _picker = ImagePicker();
   late Future<_ProfileResult> _future;
-  String _language = 'en';
-  bool _languageInitialized = false;
   bool _notifyEmail = true;
   bool _notifySms = false;
   bool _notificationsInitialized = false;
@@ -162,15 +165,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _updateNotificationPref({bool? email, bool? sms}) async {
-    if (_notificationsSaving) return;
-    final messenger = ScaffoldMessenger.of(context);
+  Future<bool> _updateNotificationPref({bool? email, bool? sms, BuildContext? feedbackContext}) async {
+    if (_notificationsSaving) return false;
+    final ctx = feedbackContext ?? context;
+    final messenger = ScaffoldMessenger.of(ctx);
     final loggedIn = await AuthService.instance.isLoggedIn();
     if (!loggedIn) {
-      final ok = await Navigator.of(context).push<bool>(
+      final ok = await Navigator.of(ctx).push<bool>(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-      if (ok != true) return;
+      if (ok != true) return false;
     }
 
     final userId = await AuthService.instance.getUserId();
@@ -178,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Please login to update notifications.')),
       );
-      return;
+      return false;
     }
 
     final prevEmail = _notifyEmail;
@@ -198,15 +202,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'notify_email': nextEmail ? '1' : '0',
         'notify_sms': nextSms ? '1' : '0',
       });
-      if (!mounted) return;
+      if (!mounted) return true;
       setState(() {
         _notificationsSaving = false;
       });
       messenger.showSnackBar(
         const SnackBar(content: Text('Notification preferences updated.')),
       );
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _notifyEmail = prevEmail;
         _notifySms = prevSms;
@@ -215,7 +220,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
       messenger.showSnackBar(
         SnackBar(content: Text('Failed to update notifications: $e')),
       );
+      return false;
     }
+  }
+
+  void _openNotificationSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NotificationSettingsScreen(
+          initialEmail: _notifyEmail,
+          initialSms: _notifySms,
+          onEmailChanged: (value, ctx) =>
+              _updateNotificationPref(email: value, feedbackContext: ctx),
+          onSmsChanged: (value, ctx) =>
+              _updateNotificationPref(sms: value, feedbackContext: ctx),
+        ),
+      ),
+    );
+  }
+
+  void _openPaymentMethods() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PaymentMethodsScreen(),
+      ),
+    );
+  }
+
+  void _openPrivacySecurity() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PrivacySecurityScreen(),
+      ),
+    );
+  }
+
+  void _openHelpSupport() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const HelpSupportScreen(),
+      ),
+    );
+  }
+
+  void _openAboutRotana() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AboutRotanaScreen(),
+      ),
+    );
   }
 
   Future<_ProfileResult> _load() async {
@@ -568,7 +621,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == true && mounted) {
       setState(() {
         _future = _load();
-        _languageInitialized = false;
       });
       messenger.showSnackBar(
         const SnackBar(content: Text('Profile updated successfully.')),
@@ -578,9 +630,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mutedText = scheme.onSurface.withOpacity(0.6);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: scheme.background,
       appBar: AppBar(
+        backgroundColor: theme.appBarTheme.backgroundColor ?? scheme.surface,
         title: const Text('Profile'),
         actions: [
           IconButton(
@@ -626,21 +683,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .toList();
           final emergency =
               Map<String, dynamic>.from(m['emergency_contact'] as Map? ?? const {});
-
-          final preferredLang = (user['language'] ??
-                  user['preferred_language'] ??
-                  user['lang'])
-              ?.toString()
-              .toLowerCase();
-          if (!_languageInitialized && preferredLang != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              setState(() {
-                _language = preferredLang.startsWith('b') ? 'ms' : 'en';
-                _languageInitialized = true;
-              });
-            });
-          }
 
           if (!_notificationsInitialized) {
             final emailPref = _readBool(
@@ -703,23 +745,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onEdit: _chooseEmergencyContact,
               ),
               const SizedBox(height: 12),
-              _NotificationsCard(
-                emailEnabled: _notifyEmail,
-                smsEnabled: _notifySms,
-                loading: _notificationsSaving,
-                onEmailChanged: (value) => _updateNotificationPref(email: value),
-                onSmsChanged: (value) => _updateNotificationPref(sms: value),
+              _SettingsCard(
+                onNotifications: _openNotificationSettings,
+                onPaymentMethods: _openPaymentMethods,
+                onPrivacySecurity: _openPrivacySecurity,
+                onHelpSupport: _openHelpSupport,
+                onAbout: _openAboutRotana,
               ),
-              const SizedBox(height: 12),
-              _LanguageCard(
-                selected: _language,
-                onChanged: (value) => setState(() {
-                  _language = value;
-                  _languageInitialized = true;
-                }),
-              ),
-              const SizedBox(height: 12),
-              const _SettingsCard(),
               const SizedBox(height: 18),
               _LogoutButton(
                 onLogout: () async {
@@ -727,7 +759,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (!mounted) return;
                   setState(() {
                     _future = _load();
-                    _languageInitialized = false;
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Logged out successfully.')),
@@ -738,10 +769,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(
                 'Rotana Travel & Tours\nVersion 2.1.0',
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.black54),
+                style: theme.textTheme.bodySmall?.copyWith(color: mutedText),
               ),
             ],
           );
@@ -781,9 +809,14 @@ class _ProfileHeader extends StatelessWidget {
             .toUpperCase()
         : '?';
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final subtleText = scheme.onSurface.withOpacity(0.45);
+    final mutedText = scheme.onSurface.withOpacity(0.65);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 8)),
@@ -795,7 +828,7 @@ class _ProfileHeader extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 32,
-            backgroundColor: const Color(0xFFEEF1F7),
+            backgroundColor: scheme.surfaceVariant.withOpacity(0.35),
             backgroundImage: avatarImage,
             child: avatarImage == null
                 ? Text(
@@ -821,12 +854,12 @@ class _ProfileHeader extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(
                       children: [
-                        const Icon(Icons.mail_outline, size: 16, color: Colors.black54),
+                        Icon(Icons.mail_outline, size: 16, color: subtleText),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             email,
-                            style: const TextStyle(color: Colors.black54),
+                            style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
                           ),
                         ),
                       ],
@@ -837,12 +870,11 @@ class _ProfileHeader extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(
                       children: [
-                        const Icon(Icons.phone_outlined,
-                            size: 16, color: Colors.black54),
+                        Icon(Icons.phone_outlined, size: 16, color: subtleText),
                         const SizedBox(width: 6),
                         Text(
                           phone,
-                          style: const TextStyle(color: Colors.black54),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
                         ),
                       ],
                     ),
@@ -874,9 +906,11 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -886,20 +920,20 @@ class _StatsRow extends StatelessWidget {
       child: Row(
         children: [
           _ProfileStat(label: 'Trips Completed', value: completed),
-          _divider(),
+          _divider(context),
           _ProfileStat(label: 'Upcoming', value: upcoming),
-          _divider(),
+          _divider(context),
           _ProfileStat(label: 'Family Members', value: familyMembers),
         ],
       ),
     );
   }
 
-  Widget _divider() => Container(
+  Widget _divider(BuildContext context) => Container(
         width: 1,
         height: 36,
         margin: const EdgeInsets.symmetric(horizontal: 12),
-        color: const Color(0xFFE3E5EB),
+        color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6),
       );
 }
 
@@ -950,9 +984,12 @@ class _SavedTravellersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final preview = travellers.take(3).toList();
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mutedText = scheme.onSurfaceVariant;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -964,9 +1001,9 @@ class _SavedTravellersCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Saved Travellers',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               IconButton(
@@ -977,9 +1014,12 @@ class _SavedTravellersCard extends StatelessWidget {
             ],
           ),
           if (preview.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('No travellers saved yet.'),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'No travellers saved yet.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+              ),
             )
           else
             ...preview.map(
@@ -989,14 +1029,19 @@ class _SavedTravellersCard extends StatelessWidget {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFECEFF4),
+                    backgroundColor: scheme.surfaceVariant.withOpacity(0.5),
                     child: Text(
                       name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   title: Text(name.isEmpty ? 'Traveller' : name),
-                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
+                  subtitle: subtitle.isEmpty
+                      ? null
+                      : Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(color: mutedText),
+                        ),
                   onTap: onEdit != null ? () => onEdit!(m) : onViewAll,
                   dense: true,
                 );
@@ -1027,7 +1072,7 @@ class _SavedTravellersCard extends StatelessWidget {
     if (dob != null) {
       parts.add('DOB: ${DateFormat('dd/MM/yyyy').format(dob)}');
     }
-    return parts.join(' ? ');
+    return parts.join(' • ');
   }
 }
 
@@ -1048,9 +1093,12 @@ class _EmergencyContactCard extends StatelessWidget {
             '')
         .toString();
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mutedText = scheme.onSurfaceVariant;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -1062,9 +1110,9 @@ class _EmergencyContactCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Emergency Contact',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               IconButton(
@@ -1076,18 +1124,21 @@ class _EmergencyContactCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           if (name.isEmpty && phone.isEmpty)
-            const Text('No emergency contact added.')
+            Text(
+              'No emergency contact added.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+            )
           else ...[
             Text(
               name.isEmpty ? 'Emergency Contact' : name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             if (relation.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   relation,
-                  style: const TextStyle(color: Colors.black54),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
                 ),
               ),
             if (phone.isNotEmpty)
@@ -1095,7 +1146,7 @@ class _EmergencyContactCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   phone,
-                  style: const TextStyle(color: Colors.black54),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
                 ),
               ),
           ],
@@ -1105,157 +1156,63 @@ class _EmergencyContactCard extends StatelessWidget {
   }
 }
 
-class _NotificationsCard extends StatelessWidget {
-  const _NotificationsCard({
-    required this.emailEnabled,
-    required this.smsEnabled,
-    required this.loading,
-    required this.onEmailChanged,
-    required this.onSmsChanged,
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    this.onNotifications,
+    this.onPaymentMethods,
+    this.onPrivacySecurity,
+    this.onHelpSupport,
+    this.onAbout,
   });
 
-  final bool emailEnabled;
-  final bool smsEnabled;
-  final bool loading;
-  final ValueChanged<bool> onEmailChanged;
-  final ValueChanged<bool> onSmsChanged;
+  final VoidCallback? onNotifications;
+  final VoidCallback? onPaymentMethods;
+  final VoidCallback? onPrivacySecurity;
+  final VoidCallback? onHelpSupport;
+  final VoidCallback? onAbout;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Notifications',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const Spacer(),
-              if (loading)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SwitchListTile.adaptive(
-            value: emailEnabled,
-            onChanged: loading ? null : onEmailChanged,
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Email updates'),
-            subtitle: const Text('Receive booking reminders and payment receipts by email.'),
-          ),
-          const Divider(height: 1),
-          SwitchListTile.adaptive(
-            value: smsEnabled,
-            onChanged: loading ? null : onSmsChanged,
-            contentPadding: EdgeInsets.zero,
-            title: const Text('SMS alerts'),
-            subtitle: const Text('Get important travel alerts via SMS.'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LanguageCard extends StatelessWidget {
-  const _LanguageCard({required this.selected, required this.onChanged});
-  final String selected;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Language',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 14),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'en', label: Text('English')),
-              ButtonSegment(value: 'ms', label: Text('Bahasa')),
-            ],
-            style: ButtonStyle(
-              shape: MaterialStateProperty.all(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-              ),
-            ),
-            selected: <String>{selected},
-            onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) {
-                onChanged(selection.first);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
-        ],
-      ),
-      child: Column(
-        children: const [
           _SettingsTile(
             icon: Icons.notifications_outlined,
             label: 'Notifications',
+            onTap: onNotifications,
           ),
-          Divider(height: 1),
+          const Divider(height: 1),
           _SettingsTile(
             icon: Icons.credit_card_outlined,
             label: 'Payment Methods',
+            onTap: onPaymentMethods,
           ),
-          Divider(height: 1),
+          const Divider(height: 1),
           _SettingsTile(
             icon: Icons.lock_outline,
             label: 'Privacy & Security',
+            onTap: onPrivacySecurity,
           ),
-          Divider(height: 1),
+          const Divider(height: 1),
           _SettingsTile(
             icon: Icons.support_agent_outlined,
             label: 'Help & Support',
+            onTap: onHelpSupport,
           ),
-          Divider(height: 1),
+          const Divider(height: 1),
           _SettingsTile(
             icon: Icons.info_outline,
             label: 'About Rotana',
+            onTap: onAbout,
           ),
         ],
       ),
@@ -1264,17 +1221,21 @@ class _SettingsCard extends StatelessWidget {
 }
 
 class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({required this.icon, required this.label});
+  const _SettingsTile({required this.icon, required this.label, this.onTap});
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return ListTile(
-      leading: Icon(icon, color: Colors.black87),
-      title: Text(label),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
+      leading: Icon(icon, color: scheme.primary),
+      title: Text(label, style: theme.textTheme.bodyMedium),
+      trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+      onTap: onTap,
+      enabled: onTap != null,
     );
   }
 }
