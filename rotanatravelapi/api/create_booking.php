@@ -48,12 +48,30 @@ $bid = (int)$pdo->lastInsertId();
 // store travellers JSON (or rows)
 $travellers = is_array($i['travellers']) ? $i['travellers'] : [];
 foreach ($travellers as $t) {
-  $fullName = trim($t['full_name'] ?? '');
+  if ($t instanceof stdClass) {
+    $t = (array)$t;
+  }
+  if (!is_array($t)) continue;
+
+  $normalized = build_normalized_key_map($t);
+  $fullName = trim((string)(array_pick_value($t, $normalized, ['full_name', 'fullName', 'name']) ?? ''));
   if ($fullName === '') continue;
-  $passport = trim($t['passport'] ?? $t['passport_no'] ?? '');
-  $dob = $t['dob'] ?? $t['date_of_birth'] ?? null;
-  $issue = $t['issue_date'] ?? null;
-  $expiry = $t['expiry_date'] ?? null;
+
+  $passport = array_pick_value($t, $normalized, ['passport', 'passport_no', 'passportNo'], true);
+  $dobValue = array_pick_value($t, $normalized, ['dob', 'date_of_birth', 'birth_date', 'dateOfBirth'], false);
+  $issueValue = array_pick_value(
+    $t,
+    $normalized,
+    ['passport_issue_date', 'issue_date', 'passportIssueDate', 'issueDate'],
+    false
+  );
+  $expiryValue = array_pick_value(
+    $t,
+    $normalized,
+    ['passport_expiry_date', 'expiry_date', 'passportExpiryDate', 'expiryDate'],
+    false
+  );
+  $genderValue = array_pick_value($t, $normalized, ['gender'], true);
 
   $pdo->prepare("
     INSERT INTO booking_travellers (booking_id, full_name, passport_no, dob, gender, passport_issue_date, passport_expiry_date)
@@ -61,11 +79,11 @@ foreach ($travellers as $t) {
   ")->execute([
     $bid,
     $fullName,
-    $passport,
-    $dob ? date('Y-m-d', strtotime($dob)) : null,
-    $t['gender'] ?? null,
-    $issue ? date('Y-m-d', strtotime($issue)) : null,
-    $expiry ? date('Y-m-d', strtotime($expiry)) : null,
+    $passport === null ? null : trim((string)$passport),
+    normalize_date_value($dobValue),
+    normalize_gender_value($genderValue),
+    normalize_date_value($issueValue),
+    normalize_date_value($expiryValue),
   ]);
 }
 
