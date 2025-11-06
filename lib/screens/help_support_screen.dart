@@ -113,7 +113,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: const [
                 BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -123,9 +123,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Popular questions',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
                 ...faqs.map((item) => _FaqExpansion(item: item)).toList(),
@@ -135,7 +138,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: const [
                 BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -145,9 +148,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Send us a message',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -183,7 +189,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Our support team replies within 24 hours. For urgent travel changes, please call us directly.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -226,7 +235,10 @@ class _FaqExpansionState extends State<_FaqExpansion> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
               widget.item.answer,
-              style: const TextStyle(color: Colors.black87),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
             ),
           ),
         const Divider(height: 1),

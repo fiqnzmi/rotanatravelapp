@@ -11,24 +11,31 @@ class AppTheme {
     final scheme = ColorScheme.fromSeed(seedColor: brandBlue, brightness: b);
     final text   = GoogleFonts.plusJakartaSansTextTheme();
 
+    final cardColor = scheme.surface;
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       textTheme: text.apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface),
       scaffoldBackgroundColor:
           b == Brightness.light ? const Color(0xFFF6F8FA) : const Color(0xFF0B1218),
+      canvasColor:
+          b == Brightness.light ? const Color(0xFFF6F8FA) : const Color(0xFF0B1218),
 
       // premium cards
-      cardTheme: const CardThemeData(
+      cardTheme: CardThemeData(
+        color: cardColor,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(22))),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(22))),
       ),
+      cardColor: cardColor,
 
       // inputs
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: b == Brightness.light ? Colors.white : scheme.surface.withValues(alpha: 0.85),
+        fillColor: b == Brightness.light ? Colors.white : scheme.surfaceVariant.withOpacity(0.55),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         hintStyle: TextStyle(color: scheme.onSurfaceVariant),
         border: OutlineInputBorder(
@@ -83,13 +90,35 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
-        titleTextStyle: text.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: .2),
+        foregroundColor: scheme.onSurface,
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        titleTextStyle: text.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          letterSpacing: .2,
+          color: scheme.onSurface,
+        ),
       ),
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: b == Brightness.light ? Colors.white : scheme.surface,
         indicatorColor: brandBlue.withValues(alpha: .12),
-        labelTextStyle: WidgetStatePropertyAll(text.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) {
+            final base = text.labelMedium?.copyWith(fontWeight: FontWeight.w600);
+            final color = states.contains(MaterialState.selected)
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant.withOpacity(b == Brightness.dark ? 0.9 : 0.7);
+            return base?.copyWith(color: color);
+          },
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) {
+            final color = states.contains(MaterialState.selected)
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant.withOpacity(b == Brightness.dark ? 0.9 : 0.7);
+            return IconThemeData(color: color);
+          },
+        ),
       ),
     );
   }

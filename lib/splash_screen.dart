@@ -44,8 +44,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: FadeTransition(
           opacity: _fade,
@@ -63,10 +65,10 @@ class _SplashScreenState extends State<SplashScreen>
                 const SizedBox(height: 10),
                 Text(
                   'Kembara Jiwa, Terapi Rohani',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                         fontStyle: FontStyle.italic,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black54,
+                        color: scheme.onSurfaceVariant,
                       ),
                   textAlign: TextAlign.center,
                 ),

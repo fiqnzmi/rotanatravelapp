@@ -12,8 +12,10 @@ class BookingService {
 
   Future<List<Booking>> myBookings() async {
     final userId = await AuthService.instance.getUserId();
-    final query = userId != null ? {'user_id': '$userId'} : null;
-    final list = await _api.get('my_bookings.php', query: query);
+    if (userId == null) {
+      return [];
+    }
+    final list = await _api.get('my_bookings.php', query: {'user_id': '$userId'});
     final arr = (list as List? ?? [])
         .whereType<Map<String, dynamic>>()
         .map((m) => Map<String, dynamic>.from(m))

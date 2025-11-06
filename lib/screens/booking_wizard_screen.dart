@@ -4,6 +4,8 @@ import '../services/booking_service.dart';
 import '../models/traveller.dart';
 import '../services/auth_service.dart';
 import '../services/family_service.dart';
+import '../services/dashboard_service.dart';
+import '../utils/error_utils.dart';
 import '../utils/json_utils.dart';
 import 'trips_screen.dart';
 import 'login_screen.dart';
@@ -26,17 +28,22 @@ class BookingWizardScreen extends StatefulWidget {
 class _BookingWizardScreenState extends State<BookingWizardScreen> {
   final _svc = BookingService();
   final _family = FamilyService();
+  final _dashboard = DashboardService();
   final _formKey = GlobalKey<FormState>();
   final List<Traveller> travellers = [];
   final DateFormat _uiDateFormat = DateFormat('dd/MM/yyyy');
   int adults = 1;
   int children = 0;
   bool _submitting = false;
+  bool _loadingProfile = false;
+  Map<String, dynamic>? _profileCache;
+  List<Map<String, dynamic>> _familyCache = const [];
 
   @override
   void initState() {
     super.initState();
     _syncTravellers();
+    _prefillFromProfile();
   }
 
   void _syncTravellers() {
@@ -73,19 +80,29 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       ..addAll(childTravellers);
   }
 
+  Future<void> _prefillFromProfile() async {
+    final userId = await AuthService.instance.getUserId();
+    if (userId == null || userId <= 0) return;
+    try {
+      final user = await _loadProfileUser(userId);
+      final seed = _travellerFromProfile(user);
+      if (seed == null) return;
+      if (travellers.isEmpty) {
+        travellers.add(Traveller(isChild: false));
+      }
+      final merged = _mergeTraveller(travellers.first, seed);
+      setState(() {
+        travellers[0] = merged;
+      });
+    } catch (_) {
+      // Silent; autofill button will surface errors if needed.
+    }
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    final loggedIn = await AuthService.instance.isLoggedIn();
-    if (!loggedIn) {
-      final proceed = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-      );
-      if (proceed != true) {
-        return;
-      }
-    }
+    final userId = await _ensureLoggedIn();
+    if (userId == null) return;
 
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
@@ -105,6 +122,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       'package_id': widget.packageId,
       'adults': adults,
       'children': children,
+      'user_id': userId,
       'travellers': travellers.map((t) => t.toJson()).toList(),
     };
     try {
@@ -119,8 +137,9 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create booking: ${friendlyError(e)}')),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -128,8 +147,10 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Booking – ${widget.title}'),
       ),
@@ -141,15 +162,37 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Add Travellers',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Please provide details for all travellers',
-                  style: TextStyle(color: Colors.black54),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                 ),
+                const SizedBox(height: 18),
+                if (_loadingProfile)
+                  Row(
+                    children: const [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 10),
+                      Text('Fetching your saved details...'),
+                    ],
+                  )
+                else
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _autofillTravellers,
+                      icon: const Icon(Icons.auto_fix_high_outlined),
+                      label: const Text('Autofill from my account'),
+                    ),
+                  ),
                 const SizedBox(height: 18),
                 _countSelector(
                   label: 'Adults',
@@ -188,6 +231,8 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    foregroundColor: scheme.primary,
+                    side: BorderSide(color: scheme.primary, width: 1.4),
                   ),
                   icon: const Icon(Icons.person_add_alt_1),
                   label: const Text('Add Another Traveller'),
@@ -219,12 +264,19 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
     final isLead = index == 0 && !traveller.isChild;
     final typeLabel = traveller.isChild ? 'Child' : 'Adult';
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final badgeColor = scheme.surfaceVariant.withOpacity(
+      theme.brightness == Brightness.dark ? 0.35 : 0.8,
+    );
+    final badgeTextColor = traveller.isChild ? scheme.primary : scheme.secondary;
+
     return Container(
       key: ValueKey(traveller),
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(color: Color(0x15000000), blurRadius: 18, offset: Offset(0, 12)),
@@ -238,25 +290,26 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
               Expanded(
                 child: Text(
                   'Traveller ${index + 1}${isLead ? ' (Lead)' : ''}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
               TextButton.icon(
                 onPressed: () => _pickSavedForSlot(index),
                 icon: const Icon(Icons.person_search, size: 18),
                 label: const Text('Use saved'),
+                style: TextButton.styleFrom(foregroundColor: scheme.primary),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: traveller.isChild ? const Color(0xFFEAF4FF) : const Color(0xFFE8F7EF),
+                  color: badgeColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   typeLabel,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: traveller.isChild ? const Color(0xFF1769FF) : const Color(0xFF1B8730),
+                    color: badgeTextColor,
                   ),
                 ),
               ),
@@ -425,11 +478,11 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
 
     List<Map<String, dynamic>> family;
     try {
-      family = await _family.list(userId);
+      family = await _loadFamilyList(userId, force: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load saved travellers: $e')),
+        SnackBar(content: Text('Failed to load saved travellers: ${friendlyError(e)}')),
       );
       return;
     }
@@ -519,23 +572,189 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
   }
 
   Traveller _travellerFromFamily(Map<String, dynamic> f, {required bool isChildSlot}) {
-    final dob = readDateTimeOrNull(f['dob']);
-    final issue = readDateTimeOrNull(f['passport_issue_date']);
-    final expiry = readDateTimeOrNull(f['passport_expiry_date']);
-    final name = (f['full_name'] ?? f['name'] ?? '').toString();
-    final gender = (f['gender'] ?? '').toString().toLowerCase();
-    final passport = (f['passport_no'] ?? '').toString();
+    final seed = _travellerFromFamilyRecord(f);
+    if (seed == null) {
+      return Traveller(isChild: isChildSlot);
+    }
+    return Traveller(
+      fullName: seed.fullName,
+      gender: seed.gender,
+      dateOfBirth: seed.dateOfBirth,
+      passportNo: seed.passportNo,
+      passportIssueDate: seed.passportIssueDate,
+      passportExpiryDate: seed.passportExpiryDate,
+      isChild: isChildSlot,
+      familyMemberId: seed.familyMemberId,
+    );
+  }
 
+  Traveller _mergeTraveller(Traveller current, Traveller? seed) {
+    if (seed == null) return current;
+    return Traveller(
+      fullName: current.fullName.isNotEmpty ? current.fullName : seed.fullName,
+      gender: current.gender ?? seed.gender,
+      dateOfBirth: current.dateOfBirth ?? seed.dateOfBirth,
+      passportNo: current.passportNo ?? seed.passportNo,
+      passportIssueDate: current.passportIssueDate ?? seed.passportIssueDate,
+      passportExpiryDate: current.passportExpiryDate ?? seed.passportExpiryDate,
+      isChild: current.isChild,
+      familyMemberId: current.familyMemberId ?? seed.familyMemberId,
+    );
+  }
+
+  bool _isChild(DateTime? dob) {
+    if (dob == null) return false;
+    final years = DateTime.now().difference(dob).inDays / 365.25;
+    return years < 12;
+  }
+
+  Traveller? _travellerFromProfile(Map<String, dynamic> user) {
+    final name = (user['name'] ?? user['full_name'] ?? '').toString().trim();
+    if (name.isEmpty) return null;
+    final dob = readDateTimeOrNull(user['dob'] ?? user['date_of_birth']);
+    final genderRaw = (user['gender'] ?? '').toString().toLowerCase();
+    final gender = (genderRaw == 'male' || genderRaw == 'female') ? genderRaw : null;
+    final passport = (user['passport_no'] ?? user['passport'] ?? '').toString();
+    final issue = readDateTimeOrNull(user['passport_issue_date']);
+    final expiry = readDateTimeOrNull(user['passport_expiry_date']);
     return Traveller(
       fullName: name,
-      gender: gender.isNotEmpty ? gender : null,
+      gender: gender,
       dateOfBirth: dob,
       passportNo: passport.isNotEmpty ? passport : null,
       passportIssueDate: issue,
       passportExpiryDate: expiry,
-      isChild: isChildSlot,
+      isChild: _isChild(dob),
+    );
+  }
+
+  Traveller? _travellerFromFamilyRecord(Map<String, dynamic> f) {
+    final name = (f['full_name'] ?? f['name'] ?? '').toString().trim();
+    if (name.isEmpty) return null;
+    final dob = readDateTimeOrNull(f['dob']);
+    final issue = readDateTimeOrNull(f['passport_issue_date']);
+    final expiry = readDateTimeOrNull(f['passport_expiry_date']);
+    final genderRaw = (f['gender'] ?? '').toString().toLowerCase();
+    final gender = (genderRaw == 'male' || genderRaw == 'female') ? genderRaw : null;
+    final passport = (f['passport_no'] ?? '').toString();
+    final relationship = (f['relationship'] ?? '').toString().toLowerCase();
+    var isChild = _isChild(dob);
+    if (dob == null && relationship.contains('child')) {
+      isChild = true;
+    }
+    return Traveller(
+      fullName: name,
+      gender: gender,
+      dateOfBirth: dob,
+      passportNo: passport.isNotEmpty ? passport : null,
+      passportIssueDate: issue,
+      passportExpiryDate: expiry,
+      isChild: isChild,
       familyMemberId: readIntOrNull(f['id']),
     );
+  }
+
+  Future<void> _autofillTravellers() async {
+    final userId = await _ensureLoggedIn();
+    if (userId == null) return;
+    if (_loadingProfile) return;
+
+    setState(() => _loadingProfile = true);
+    try {
+      final user = await _loadProfileUser(userId);
+      final family = await _loadFamilyList(userId);
+
+      _syncTravellers();
+
+      final adultSeeds = <Traveller>[];
+      final childSeeds = <Traveller>[];
+      var applied = false;
+
+      final profileSeed = _travellerFromProfile(user);
+      if (profileSeed != null) {
+        (profileSeed.isChild ? childSeeds : adultSeeds).add(profileSeed);
+      }
+
+      for (final f in family) {
+        final seed = _travellerFromFamilyRecord(f);
+        if (seed == null) continue;
+        if (seed.isChild) {
+          childSeeds.add(seed);
+        } else {
+          adultSeeds.add(seed);
+        }
+      }
+
+      final updated = <Traveller>[];
+      for (final current in travellers) {
+        Traveller? seed;
+        if (current.isChild && childSeeds.isNotEmpty) {
+          seed = childSeeds.removeAt(0);
+        } else if (!current.isChild && adultSeeds.isNotEmpty) {
+          seed = adultSeeds.removeAt(0);
+        }
+        if (seed != null) {
+          applied = true;
+        }
+        updated.add(_mergeTraveller(current, seed));
+      }
+
+      setState(() {
+        for (var i = 0; i < travellers.length && i < updated.length; i++) {
+          travellers[i] = updated[i];
+        }
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            applied
+                ? 'Traveller details autofilled from your account.'
+                : 'No saved traveller data available to autofill.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to autofill travellers: ${friendlyError(e)}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingProfile = false);
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadProfileUser(int userId) async {
+    if (_profileCache == null) {
+      _profileCache = await _dashboard.profileOverview(userId);
+    }
+    final user = _profileCache?['user'];
+    return Map<String, dynamic>.from(user as Map? ?? const {});
+  }
+
+  Future<List<Map<String, dynamic>>> _loadFamilyList(int userId, {bool force = false}) async {
+    if (force || _familyCache.isEmpty) {
+      _familyCache = await _family.list(userId);
+    }
+    return _familyCache;
+  }
+
+  Future<int?> _ensureLoggedIn() async {
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final proceed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+      if (proceed != true) {
+        return null;
+      }
+    }
+    return await AuthService.instance.getUserId();
   }
 
   Widget _countSelector({
@@ -544,10 +763,12 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
     String? subtitle,
     required ValueChanged<int> onChanged,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, 6)),
@@ -560,12 +781,12 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               if (subtitle != null)
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.black45),
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant.withOpacity(0.6)),
                 ),
             ],
           ),
@@ -579,7 +800,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               '$value',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           _roundedIcon(
@@ -592,6 +813,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
   }
 
   Widget _roundedIcon({required IconData icon, required VoidCallback onTap, bool enabled = true}) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(22),
@@ -599,32 +821,41 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: enabled ? const Color(0xFF0E8AE8) : const Color(0xFFE4E7EB),
+          color: enabled
+              ? scheme.primary
+              : scheme.surfaceVariant.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.35 : 1),
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Icon(icon, color: Colors.white, size: 20),
+        child: Icon(icon, color: enabled ? scheme.onPrimary : scheme.onSurfaceVariant, size: 20),
       ),
     );
   }
 
   InputDecoration _inputDecoration(String label, {String? hint}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: Colors.white,
+      fillColor: fillColor,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFD5DDE5)),
+        borderSide: BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFD5DDE5)),
+        borderSide: BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF0E8AE8), width: 2),
+        borderSide: BorderSide(color: scheme.primary, width: 2),
       ),
     );
   }
@@ -647,13 +878,24 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+          style: textTheme.bodySmall?.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 6),
         InkWell(
@@ -663,21 +905,23 @@ class _DateField extends StatelessWidget {
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: fillColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFD5DDE5)),
+              border: Border.all(color: borderColor),
             ),
             child: Row(
               children: [
                 Text(
                   value == null ? placeholder : formatter.format(value!),
                   style: textTheme.bodyMedium?.copyWith(
-                    color: value == null ? Colors.black45 : Colors.black87,
+                    color: value == null
+                        ? scheme.onSurfaceVariant.withOpacity(0.6)
+                        : scheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.black54),
+                Icon(Icons.calendar_today_outlined, size: 18, color: scheme.onSurfaceVariant),
               ],
             ),
           ),

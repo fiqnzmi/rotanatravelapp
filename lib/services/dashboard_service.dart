@@ -61,23 +61,29 @@ class DashboardService {
       ),
     );
 
-    final response = await request.send();
-    final text = await response.stream.bytesToString();
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Upload failed (HTTP ${response.statusCode}): $text');
-    }
-
-    final decoded = jsonDecode(text);
-    if (decoded is Map<String, dynamic>) {
-      if (decoded['success'] == true) {
-        final data = decoded['data'];
-        if (data is Map<String, dynamic>) return Map<String, dynamic>.from(data);
-        return <String, dynamic>{};
+    try {
+      final response = await request.send();
+      final text = await response.stream.bytesToString();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Upload failed (HTTP ${response.statusCode}): $text');
       }
-      throw Exception(decoded['error'] ?? 'Failed to upload profile photo');
-    }
 
-    throw Exception('Unexpected response from server.');
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) {
+        if (decoded['success'] == true) {
+          final data = decoded['data'];
+          if (data is Map<String, dynamic>) return Map<String, dynamic>.from(data);
+          return <String, dynamic>{};
+        }
+        throw Exception(decoded['error'] ?? 'Failed to upload profile photo');
+      }
+
+      throw Exception('Unexpected response from server.');
+    } on SocketException catch (_) {
+      throw const NoConnectionException();
+    } on http.ClientException catch (_) {
+      throw const NoConnectionException();
+    }
   }
 
   MediaType _detectMimeType(String path) {

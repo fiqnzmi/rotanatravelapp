@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'api_client.dart';
 
 class PrayerTimesData {
   PrayerTimesData({
@@ -63,15 +65,21 @@ class PrayerTimesService {
 
   Future<Map<String, dynamic>> _request(Map<String, String> params) async {
     final uri = Uri.https('api.aladhan.com', '/v1/timings', params);
-    final res = await _client.get(uri);
-    if (res.statusCode != 200) {
-      throw Exception('Prayer times error (HTTP ${res.statusCode})');
+    try {
+      final res = await _client.get(uri);
+      if (res.statusCode != 200) {
+        throw Exception('Prayer times error (HTTP ${res.statusCode})');
+      }
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      if (decoded['code'] != 200) {
+        throw Exception(decoded['status'] ?? 'Failed to load prayer times');
+      }
+      return decoded;
+    } on SocketException catch (_) {
+      throw const NoConnectionException();
+    } on http.ClientException catch (_) {
+      throw const NoConnectionException();
     }
-    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    if (decoded['code'] != 200) {
-      throw Exception(decoded['status'] ?? 'Failed to load prayer times');
-    }
-    return decoded;
   }
 
   PrayerTimesData _buildData(

@@ -13,7 +13,33 @@ if ($userId <= 0) {
 }
 
 $pdo = db();
-$stmt = $pdo->prepare('SELECT id, username, name, email, phone, notify_email, notify_sms, preferred_language, emergency_contact_id, profile_photo, profile_photo_url FROM users WHERE id = ? LIMIT 1');
+
+$hasGender = db_column_exists($pdo, 'users', 'gender');
+$hasDob = db_column_exists($pdo, 'users', 'dob');
+$hasPassport = db_column_exists($pdo, 'users', 'passport_no');
+$hasAddress = db_column_exists($pdo, 'users', 'address');
+$hasProfilePhotoUrl = db_column_exists($pdo, 'users', 'profile_photo_url');
+
+$selectColumns = [
+  'id',
+  'username',
+  'name',
+  'email',
+  'phone',
+  'notify_email',
+  'notify_sms',
+  'preferred_language',
+  'emergency_contact_id',
+  'profile_photo',
+];
+
+if ($hasGender) $selectColumns[] = 'gender';
+if ($hasDob) $selectColumns[] = 'dob';
+if ($hasPassport) $selectColumns[] = 'passport_no';
+if ($hasAddress) $selectColumns[] = 'address';
+if ($hasProfilePhotoUrl) $selectColumns[] = 'profile_photo_url';
+
+$stmt = $pdo->prepare('SELECT ' . implode(', ', $selectColumns) . ' FROM users WHERE id = ? LIMIT 1');
 $stmt->execute([$userId]);
 $existing = $stmt->fetch();
 if (!$existing) {
@@ -86,6 +112,50 @@ if (array_key_exists('phone', $data)) {
   $phoneRaw = trim((string)$data['phone']);
   $updates[] = 'phone = :phone';
   $params[':phone'] = $phoneRaw === '' ? null : $phoneRaw;
+}
+
+if ($hasGender && array_key_exists('gender', $data)) {
+  $genderValue = $data['gender'];
+  $gender = normalize_gender_value($genderValue);
+  if ($gender === null) {
+    $text = trim((string)$genderValue);
+    if ($text !== '') {
+      fail('Invalid gender value');
+    }
+  }
+  $updates[] = 'gender = :gender';
+  $params[':gender'] = $gender;
+}
+
+$dobInput = null;
+if ($hasDob && array_key_exists('dob', $data)) {
+  $dobInput = $data['dob'];
+} elseif ($hasDob && array_key_exists('date_of_birth', $data)) {
+  $dobInput = $data['date_of_birth'];
+}
+if ($dobInput !== null) {
+  $dobNormalized = normalize_date_value($dobInput);
+  if ($dobNormalized === null) {
+    $text = trim((string)$dobInput);
+    if ($text !== '') {
+      fail('Invalid date of birth');
+    }
+  }
+  $updates[] = 'dob = :dob';
+  $params[':dob'] = $dobNormalized;
+}
+
+if ($hasPassport && (array_key_exists('passport_no', $data) || array_key_exists('passport', $data))) {
+  $passportRaw = $data['passport_no'] ?? $data['passport'];
+  $passport = trim((string)$passportRaw);
+  $updates[] = 'passport_no = :passport_no';
+  $params[':passport_no'] = $passport === '' ? null : $passport;
+}
+
+if ($hasAddress && array_key_exists('address', $data)) {
+  $address = trim((string)$data['address']);
+  $updates[] = 'address = :address';
+  $params[':address'] = $address === '' ? null : $address;
 }
 
 if (array_key_exists('notify_email', $data)) {
@@ -168,6 +238,14 @@ $updated['photo_url'] = $photoUrl;
 $updated['notify_email'] = isset($updated['notify_email']) ? (int)$updated['notify_email'] : 1;
 $updated['notify_sms'] = isset($updated['notify_sms']) ? (int)$updated['notify_sms'] : 0;
 $updated['language'] = $updated['preferred_language'] ?? null;
+$updated['gender'] = $updated['gender'] ?? null;
+$updated['passport_no'] = $updated['passport_no'] ?? null;
+$updated['address'] = $updated['address'] ?? null;
+if (!empty($updated['dob'])) {
+  $updated['dob'] = date('Y-m-d', strtotime($updated['dob']));
+} else {
+  $updated['dob'] = null;
+}
 
 if ($emergencyContact === null && !empty($updated['emergency_contact_id'])) {
   $check = $pdo->prepare('SELECT id, full_name, relationship, phone FROM family_members WHERE id = ? AND user_id = ? LIMIT 1');

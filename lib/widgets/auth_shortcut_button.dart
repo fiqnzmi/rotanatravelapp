@@ -40,6 +40,8 @@ class AuthShortcutButton extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
+        final bottomTheme = Theme.of(sheetContext);
+        final muted = bottomTheme.colorScheme.onSurfaceVariant;
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           child: Column(
@@ -49,8 +51,7 @@ class AuthShortcutButton extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Welcome to Rotana',
-                style: Theme.of(parentContext)
-                    .textTheme
+                style: bottomTheme.textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
@@ -58,10 +59,9 @@ class AuthShortcutButton extends StatelessWidget {
               Text(
                 'Log in to manage trips, payments and documents.',
                 textAlign: TextAlign.center,
-                style: Theme.of(parentContext)
-                    .textTheme
+                style: bottomTheme.textTheme
                     .bodyMedium
-                    ?.copyWith(color: Colors.black54),
+                    ?.copyWith(color: muted),
               ),
               const SizedBox(height: 16),
 

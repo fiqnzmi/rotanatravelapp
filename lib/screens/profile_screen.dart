@@ -8,6 +8,7 @@ import '../config_service.dart';
 import '../services/dashboard_service.dart';
 import '../services/family_service.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 import 'login_screen.dart';
 import 'family_members_screen.dart';
 import 'notification_settings_screen.dart';
@@ -340,6 +341,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               '')
           .toString(),
     );
+    final String originalGender = (user['gender'] ?? '').toString();
+    String? genderValue = originalGender.isNotEmpty ? originalGender.toLowerCase() : null;
+    final DateTime? dobInitial = _parseDate(user['dob'] ?? user['date_of_birth']);
+    DateTime? dobValue = dobInitial;
+    bool dobCleared = false;
+    final dobC = TextEditingController(
+      text: dobInitial != null ? DateFormat('dd/MM/yyyy').format(dobInitial) : '',
+    );
+    final passportC = TextEditingController(
+      text: (user['passport_no'] ?? user['passport'] ?? '').toString(),
+    );
+    final addressC = TextEditingController(
+      text: (user['address'] ?? '').toString(),
+    );
     final existingPhotoUrl = _photoFromMap(user);
     File? selectedPhotoFile;
     String? previewPhotoUrl = existingPhotoUrl;
@@ -368,7 +383,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               } catch (e) {
                 messenger.showSnackBar(
-                  SnackBar(content: Text('Failed to pick image: $e')),
+                  SnackBar(content: Text('Failed to pick image: ${friendlyError(e)}')),
                 );
               }
             }
@@ -420,10 +435,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             CircleAvatar(
                               radius: 48,
-                              backgroundColor: const Color(0xFFE3E9F2),
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceVariant
+                                  .withOpacity(
+                                    Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.75,
+                                  ),
                               backgroundImage: displayImage,
                               child: displayImage == null
-                                  ? const Icon(Icons.person_outline, size: 42, color: Colors.black38)
+                                  ? Icon(
+                                      Icons.person_outline,
+                                      size: 42,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    )
                                   : null,
                             ),
                             const SizedBox(height: 12),
@@ -505,9 +529,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       TextFormField(
                         controller: phoneC,
                         keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.done,
+                        textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'Phone',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: genderValue,
+                        decoration: const InputDecoration(
+                          labelText: 'Gender',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'male', child: Text('Male')),
+                          DropdownMenuItem(value: 'female', child: Text('Female')),
+                          DropdownMenuItem(value: 'other', child: Text('Other')),
+                        ],
+                        onChanged: saving
+                            ? null
+                            : (value) {
+                                setModalState(() {
+                                  genderValue = value?.toLowerCase();
+                                });
+                              },
+                        isExpanded: true,
+                      ),
+                      if (genderValue != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: saving
+                                ? null
+                                : () => setModalState(() {
+                                      genderValue = null;
+                                    }),
+                            child: const Text('Clear gender'),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: dobC,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Date of Birth',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.calendar_today_outlined),
+                        ),
+                        onTap: saving
+                            ? null
+                            : () async {
+                                final now = DateTime.now();
+                                final initialDate = dobValue ??
+                                    dobInitial ??
+                                    DateTime(now.year - 25, now.month, now.day);
+                                final firstDate = DateTime(now.year - 100, 1, 1);
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: initialDate.isBefore(firstDate)
+                                      ? firstDate
+                                      : initialDate.isAfter(now)
+                                          ? now
+                                          : initialDate,
+                                  firstDate: firstDate,
+                                  lastDate: now,
+                                );
+                                if (picked != null) {
+                                  setModalState(() {
+                                    dobValue = picked;
+                                    dobCleared = false;
+                                    dobC.text = DateFormat('dd/MM/yyyy').format(picked);
+                                  });
+                                }
+                              },
+                      ),
+                      if (dobValue != null || dobC.text.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: saving
+                                ? null
+                                : () => setModalState(() {
+                                      dobValue = null;
+                                      dobCleared = true;
+                                      dobC.text = '';
+                                    }),
+                            child: const Text('Clear date'),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: passportC,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Passport Number',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: addressC,
+                        minLines: 2,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.newline,
+                        keyboardType: TextInputType.streetAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -517,6 +645,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? null
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
+                                FocusScope.of(sheetContext).unfocus();
                                 setModalState(() => saving = true);
                                 try {
                                   final payload = <String, dynamic>{
@@ -526,9 +655,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     'email': emailC.text.trim(),
                                     'phone': phoneC.text.trim(),
                                   };
+                                  final hasExistingGender = originalGender.isNotEmpty;
+                                  if (genderValue != null && genderValue!.isNotEmpty) {
+                                    payload['gender'] = genderValue;
+                                  } else if (hasExistingGender) {
+                                    payload['gender'] = '';
+                                  }
+                                  if (dobValue != null) {
+                                    payload['dob'] = DateFormat('yyyy-MM-dd').format(dobValue!);
+                                  } else if (dobCleared && dobInitial != null) {
+                                    payload['dob'] = '';
+                                  }
+                                  payload['passport_no'] = passportC.text.trim();
+                                  payload['address'] = addressC.text.trim();
                                   payload.removeWhere(
                                     (key, value) =>
                                         key != 'user_id' &&
+                                        key != 'phone' &&
+                                        key != 'gender' &&
+                                        key != 'dob' &&
+                                        key != 'passport_no' &&
+                                        key != 'address' &&
                                         (value == null ||
                                             (value is String &&
                                                 value.trim().isEmpty)),
@@ -582,11 +729,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Navigator.of(sheetContext).pop(true);
                                 } catch (e) {
                                   setModalState(() => saving = false);
-                                  messenger
-                                      .showSnackBar(
+                                  messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Failed to update profile: $e',
+                                        'Failed to update profile: ${friendlyError(e)}',
                                       ),
                                     ),
                                   );
@@ -617,6 +763,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     usernameC.dispose();
     emailC.dispose();
     phoneC.dispose();
+    dobC.dispose();
+    passportC.dispose();
+    addressC.dispose();
 
     if (updated == true && mounted) {
       setState(() {
@@ -795,6 +944,13 @@ class _ProfileHeader extends StatelessWidget {
             user['phone_number'] ??
             '')
         .toString();
+    final rawGender = (user['gender'] ?? '').toString();
+    final genderText =
+        rawGender.isNotEmpty ? '${rawGender[0].toUpperCase()}${rawGender.substring(1)}' : '';
+    final dobDate = _parseDate(user['dob']);
+    final dobText = dobDate != null ? DateFormat('d MMM yyyy').format(dobDate) : '';
+    final passport = (user['passport_no'] ?? user['passport'] ?? '').toString();
+    final address = (user['address'] ?? '').toString();
     ImageProvider<Object>? avatarImage;
     if (photoUrl != null && photoUrl!.isNotEmpty) {
       avatarImage = NetworkImage(photoUrl!);
@@ -879,6 +1035,67 @@ class _ProfileHeader extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (genderText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline, size: 16, color: subtleText),
+                        const SizedBox(width: 6),
+                        Text(
+                          genderText,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (dobText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.cake_outlined, size: 16, color: subtleText),
+                        const SizedBox(width: 6),
+                        Text(
+                          dobText,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (passport.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.badge_outlined, size: 16, color: subtleText),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Passport: $passport',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (address.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.home_outlined, size: 16, color: subtleText),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            address,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: mutedText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -944,21 +1161,23 @@ class _ProfileStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Expanded(
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54, fontSize: 12.5),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontSize: 12.5,
+            ),
           ),
         ],
       ),
@@ -1266,6 +1485,11 @@ class _LoggedOutProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final avatarBg = scheme.surfaceVariant.withOpacity(
+      theme.brightness == Brightness.dark ? 0.35 : 0.75,
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
       child: Column(
@@ -1275,17 +1499,17 @@ class _LoggedOutProfile extends StatelessWidget {
           const SizedBox(height: 40),
           CircleAvatar(
             radius: 44,
-            backgroundColor: const Color(0xFFE8ECF4),
+            backgroundColor: avatarBg,
             child: Icon(
               Icons.person_outline,
-              color: Colors.blueGrey.shade600,
+              color: scheme.onSurfaceVariant,
               size: 44,
             ),
           ),
           const SizedBox(height: 24),
           Text(
             'Welcome to Rotana Travel',
-            style: Theme.of(context)
+            style: theme
                 .textTheme
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -1294,7 +1518,7 @@ class _LoggedOutProfile extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Create an account or log in to manage your trips, family members, and profile details.',
-            style: const TextStyle(color: Colors.black54),
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),

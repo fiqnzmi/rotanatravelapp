@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/package_service.dart';
 import '../models/package.dart';
 import 'package_detail_screen.dart';
+import '../utils/error_utils.dart';
 import '../widgets/premium.dart';
 import '../widgets/premium_chip.dart';
+import '../widgets/no_connection_view.dart';
 
 
 class PackagesScreen extends StatefulWidget {
@@ -19,6 +22,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   @override
   void initState() { super.initState(); _future = _svc.listPackages(); }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() { _future = _svc.listPackages(); });
+  }
 
   String _subtitle(TravelPackage p) {
     final parts = <String>[];
@@ -46,7 +54,13 @@ class _PackagesScreenState extends State<PackagesScreen> {
         future: _future,
         builder: (ctx, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+          if (snap.hasError) {
+            final err = snap.error;
+            if (err is NoConnectionException) {
+              return Center(child: NoConnectionView(onRetry: _reload));
+            }
+            return Center(child: Text('Error: ${friendlyError(err ?? 'Unknown error')}'));
+          }
           final items = snap.data ?? const [];
           if (items.isEmpty) return const Center(child: Text('No packages available'));
 

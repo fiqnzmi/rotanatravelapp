@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 
 class SignupScreen extends StatefulWidget {
   final VoidCallback? onAuthSuccess;
@@ -46,7 +47,7 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      _toast('$e');
+      _toast(friendlyError(e));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -59,6 +60,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
       body: ListView(
@@ -68,7 +70,7 @@ class _SignupScreenState extends State<SignupScreen> {
             margin: const EdgeInsets.only(bottom: 24),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 8)),
@@ -92,7 +94,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Create an Account',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -112,7 +114,10 @@ class _SignupScreenState extends State<SignupScreen> {
             obscure: obscure1,
             suffix: IconButton(
               onPressed: () => setState(() => obscure1 = !obscure1),
-              icon: Icon(obscure1 ? Icons.visibility : Icons.visibility_off),
+              icon: Icon(
+                obscure1 ? Icons.visibility : Icons.visibility_off,
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -122,14 +127,24 @@ class _SignupScreenState extends State<SignupScreen> {
             obscure: obscure2,
             suffix: IconButton(
               onPressed: () => setState(() => obscure2 = !obscure2),
-              icon: Icon(obscure2 ? Icons.visibility : Icons.visibility_off),
+              icon: Icon(
+                obscure2 ? Icons.visibility : Icons.visibility_off,
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               Checkbox(value: agree, onChanged: (v) => setState(() => agree = v ?? false)),
-              const Expanded(child: Text('I agree to the Terms & Privacy Policy')),
+              Expanded(
+                child: Text(
+                  'I agree to the Terms & Privacy Policy',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -164,6 +179,13 @@ class _SignupScreenState extends State<SignupScreen> {
     Widget? suffix,
     TextInputType? keyboard,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return TextField(
       controller: controller,
       obscureText: obscure,
@@ -171,15 +193,15 @@ class _SignupScreenState extends State<SignupScreen> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: fillColor,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: borderColor),
         ),
         suffixIcon: suffix,
       ),

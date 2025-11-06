@@ -4,6 +4,18 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config_service.dart';
 
+class NoConnectionException implements Exception {
+  static const defaultMessage =
+      'No internet connection was found. Check your connection or try again.';
+
+  final String message;
+  const NoConnectionException([String? message])
+      : message = message ?? defaultMessage;
+
+  @override
+  String toString() => message.isEmpty ? 'NoConnectionException' : message;
+}
+
 class ApiClient {
   Uri _u(String path, [Map<String, String>? query]) =>
       Uri.parse('${ConfigService.apiBase}/$path')
@@ -23,8 +35,7 @@ class ApiClient {
       }
       throw Exception(m['error'] ?? 'HTTP ${res.statusCode}');
     } on SocketException catch (_) {
-      throw Exception('Tidak dapat sambung ke server (${ConfigService.apiBase}). '
-          'Pastikan XAMPP Apache/MySQL berjalan dan URL betul.');
+      throw const NoConnectionException();
     } on FormatException catch (_) {
       throw Exception('Respons bukan JSON yang sah dari server.');
     }
@@ -48,8 +59,7 @@ class ApiClient {
       }
       throw Exception(m['error'] ?? 'HTTP ${res.statusCode}');
     } on SocketException catch (_) {
-      throw Exception('Tidak dapat sambung ke server (${ConfigService.apiBase}). '
-          'Gunakan 10.0.2.2 pada emulator / IP LAN pada telefon.');
+      throw const NoConnectionException();
     } on FormatException catch (_) {
       throw Exception('Respons bukan JSON yang sah dari server.');
     }

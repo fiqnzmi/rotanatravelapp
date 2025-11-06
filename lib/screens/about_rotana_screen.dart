@@ -5,6 +5,9 @@ class AboutRotanaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
     final highlights = [
       _Highlight(
         icon: Icons.card_travel,
@@ -42,7 +45,7 @@ class AboutRotanaScreen extends StatelessWidget {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: const [
                 BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -54,7 +57,7 @@ class AboutRotanaScreen extends StatelessWidget {
               children: [
                 Text(
                   'Rotana Travel & Tours',
-                  style: Theme.of(context)
+                  style: theme
                       .textTheme
                       .headlineSmall
                       ?.copyWith(fontWeight: FontWeight.w700),
@@ -64,17 +67,17 @@ class AboutRotanaScreen extends StatelessWidget {
                   'We are passionate about creating meaningful journeys for pilgrims, families, and adventurers. '
                   'Our mission is to make travel planning effortless with transparent pricing, verified partners, '
                   'and caring support every step of the way.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black87),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
                 ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, color: Colors.blueGrey),
+                    Icon(Icons.location_on_outlined, color: muted),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'HQ: Cheras Business Centre, 56100 Kuala Lumpur, Malaysia',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ),
                   ],
@@ -82,12 +85,12 @@ class AboutRotanaScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.language_outlined, color: Colors.blueGrey),
+                    Icon(Icons.language_outlined, color: muted),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'www.rotanatravel.com',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ),
                   ],
@@ -95,12 +98,12 @@ class AboutRotanaScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.mail_outline, color: Colors.blueGrey),
+                    Icon(Icons.mail_outline, color: muted),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'hello@rotanatravel.com',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ),
                   ],
@@ -113,7 +116,7 @@ class AboutRotanaScreen extends StatelessWidget {
           const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: const [
                 BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -162,7 +165,7 @@ class AboutRotanaScreen extends StatelessWidget {
           Center(
             child: Text(
               'App version 2.1.0',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+              style: theme.textTheme.bodySmall?.copyWith(color: muted),
             ),
           ),
           const SizedBox(height: 12),
@@ -190,10 +193,15 @@ class _HighlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accentBackground = scheme.primaryContainer.withOpacity(
+      theme.brightness == Brightness.dark ? 0.4 : 1,
+    );
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 10)),
@@ -205,8 +213,8 @@ class _HighlightCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 26,
-            backgroundColor: const Color(0xFFE8F7FF),
-            child: Icon(highlight.icon, color: const Color(0xFF0E8AE8)),
+            backgroundColor: accentBackground,
+            child: Icon(highlight.icon, color: scheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -215,12 +223,12 @@ class _HighlightCard extends StatelessWidget {
               children: [
                 Text(
                   highlight.title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   highlight.description,
-                  style: const TextStyle(color: Colors.black87),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
                 ),
               ],
             ),

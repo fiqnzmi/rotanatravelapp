@@ -24,6 +24,9 @@ class PaymentConfirmationScreen extends StatelessWidget {
     final message = resultUri.queryParameters['msg'] ?? '';
     final billCode = resultUri.queryParameters['billcode'] ?? '-';
     final transactionId = resultUri.queryParameters['transaction_id'] ?? '-';
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,18 +55,18 @@ class PaymentConfirmationScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 message,
-                style: const TextStyle(color: Colors.black54),
+                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
                 textAlign: TextAlign.center,
               ),
             ],
             const SizedBox(height: 32),
             if (_isSuccess)
-              _recordingStatus(),
+              _recordingStatus(context),
             if (_isSuccess) const SizedBox(height: 24),
-            _infoTile('Booking ID', '#$bookingId'),
-            _infoTile('Amount', 'RM ${amount.toStringAsFixed(2)}'),
-            _infoTile('Toyyibpay Bill', billCode),
-            _infoTile('Transaction ID', transactionId),
+            _infoTile(context, 'Booking ID', '#$bookingId'),
+            _infoTile(context, 'Amount', 'RM ${amount.toStringAsFixed(2)}'),
+            _infoTile(context, 'Toyyibpay Bill', billCode),
+            _infoTile(context, 'Transaction ID', transactionId),
             const Spacer(),
             SizedBox(
               width: double.infinity,
@@ -79,23 +82,25 @@ class PaymentConfirmationScreen extends StatelessWidget {
     );
   }
 
-  Widget _recordingStatus() {
+  Widget _recordingStatus(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (recordedInSystem) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8F5E9),
+          color: scheme.secondaryContainer,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Row(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 12),
+            Icon(Icons.check_circle, color: scheme.onSecondaryContainer),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Payment recorded in Rotana system.',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -106,18 +111,18 @@ class PaymentConfirmationScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
+          color: scheme.errorContainer,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.info_outline, color: Colors.redAccent),
+            Icon(Icons.info_outline, color: scheme.error),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Payment succeeded at Toyyibpay but could not be saved automatically.\n$recordError',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -127,13 +132,15 @@ class PaymentConfirmationScreen extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
-  Widget _infoTile(String label, String value) {
+  Widget _infoTile(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4))
@@ -144,19 +151,16 @@ class PaymentConfirmationScreen extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.black54,
+              color: scheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

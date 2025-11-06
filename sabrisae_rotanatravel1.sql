@@ -91,30 +91,30 @@ CREATE TABLE `documents` (
   `booking_id` int(11) DEFAULT NULL,
   `traveller_id` int(11) DEFAULT NULL,
   `doc_type` enum('PASSPORT','IC','VISA','TICKET','HOTEL_VOUCHER','INSURANCE','PAYMENT_PROOF','ITINERARY','OTHER') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'OTHER',
-  `file_path` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `file_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('ACTIVE','ARCHIVED','REJECTED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVE',
+  `status` enum('REQUIRED','PENDING','UNDER_REVIEW','APPROVED','ACTIVE','REJECTED','ARCHIVED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'REQUIRED',
   `uploaded_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `label` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `remarks` text COLLATE utf8mb4_unicode_ci
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `documents`
 --
 
 INSERT INTO `documents` (`id`, `user_id`, `booking_id`, `traveller_id`, `doc_type`, `file_path`, `file_name`, `mime_type`, `status`, `uploaded_at`, `label`, `remarks`) VALUES
-(1, 5, 18, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Passport', NULL),
-(2, 5, 18, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Travel Insurance', NULL),
-(3, 5, 18, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Visa', NULL),
-(4, 5, 18, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Payment Proof', NULL),
-(5, 5, 18, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:24:13', 'Additional Document', NULL),
-(6, 5, 19, NULL, 'PASSPORT', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Passport', NULL),
-(7, 5, 19, NULL, 'INSURANCE', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Travel Insurance', NULL),
-(8, 5, 19, NULL, 'VISA', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Visa', NULL),
-(9, 5, 19, NULL, 'PAYMENT_PROOF', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Payment Proof', NULL),
-(10, 5, 19, NULL, 'OTHER', '', NULL, NULL, 'ACTIVE', '2025-11-05 10:25:12', 'Additional Document', NULL);
+(1, 5, 18, NULL, 'PASSPORT', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:24:13', 'Passport', NULL),
+(2, 5, 18, NULL, 'INSURANCE', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:24:13', 'Travel Insurance', NULL),
+(3, 5, 18, NULL, 'VISA', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:24:13', 'Visa', NULL),
+(4, 5, 18, NULL, 'PAYMENT_PROOF', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:24:13', 'Payment Proof', NULL),
+(5, 5, 18, NULL, 'OTHER', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:24:13', 'Additional Document', NULL),
+(6, 5, 19, NULL, 'PASSPORT', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:25:12', 'Passport', NULL),
+(7, 5, 19, NULL, 'INSURANCE', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:25:12', 'Travel Insurance', NULL),
+(8, 5, 19, NULL, 'VISA', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:25:12', 'Visa', NULL),
+(9, 5, 19, NULL, 'PAYMENT_PROOF', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:25:12', 'Payment Proof', NULL),
+(10, 5, 19, NULL, 'OTHER', NULL, NULL, NULL, 'REQUIRED', '2025-11-05 10:25:12', 'Additional Document', NULL);
 
 -- --------------------------------------------------------
 
@@ -309,6 +309,10 @@ CREATE TABLE `users` (
   `email` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gender` enum('male','female','other') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dob` date DEFAULT NULL,
+  `passport_no` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address` text COLLATE utf8mb4_unicode_ci,
   `notify_email` tinyint(1) NOT NULL DEFAULT '1',
   `notify_sms` tinyint(1) NOT NULL DEFAULT '0',
   `preferred_language` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -322,14 +326,14 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `name`, `email`, `password_hash`, `phone`, `notify_email`, `notify_sms`, `preferred_language`, `emergency_contact_id`, `profile_photo`, `profile_photo_url`, `created_at`) VALUES
-(1, 'afiq', 'afiq', 'afiq@example.com', '$2y$10$rezod81V4ILNsK3Cmf11Feo8FlRqmO6Pb.0JXJY9udBNJ2QwBUXPi', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:41:58'),
-(4, 'afiq2', 'afiq2', 'afiq2@example.com', '$2y$10$m/seoYYNQXgY0UFjEAz0a.TtB5qiaSp0CtebZ46PlsMWEjnezdYoO', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:08'),
-(5, 'Muhammad Afiq', 'Muhammad Afiq', 'muhammadafiqnazmi2003@gmail.com', '$2y$10$2Q6Q9BGIS8HeUUf4.SF3IOKwgrM8Z4ntBEgI/N.Mmq7KASLx1CfdG', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:42'),
-(6, 'Assyabil', 'Assyabil', 'abilkry@gmail.com', '$2y$10$NIFNXbGErITAFUcPai68se7PQHsLa/7AlrFoqmLagnAfSkb2ka8Uu', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-24 16:50:11'),
-(7, 'Afiq Nazmi', 'Afiq Nazmi', 'afiqnazmi17@icloud.com', '$2y$10$ymq6UL58EOS74ZLCgBlwx.Z3/2Cw3mnEaKqkEe6vo2KM/WEOHJFG2', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-27 23:17:12'),
-(8, 'Muhammad Afiq Nazmi Bin Sulaiman', 'Muhammad Afiq Nazmi Bin Sulaiman', 'afiqnzmi@gmail.com', '$2y$10$ihYrNLR5FYFh.bcv9Upk8.FLsrwibO4p4I0cU6DrUcuDTQIo3iCVS', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-28 23:05:49'),
-(9, 'Amier', 'Amier', 'cuteamier@gmail.com', '$2y$10$HMLA4GaC2uS/Tbe10gIPFuJ.R.DdLH2LYxNeBM3Aq42fIt7SHad.2', NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-29 10:45:52');
+INSERT INTO `users` (`id`, `username`, `name`, `email`, `password_hash`, `phone`, `gender`, `dob`, `passport_no`, `address`, `notify_email`, `notify_sms`, `preferred_language`, `emergency_contact_id`, `profile_photo`, `profile_photo_url`, `created_at`) VALUES
+(1, 'afiq', 'afiq', 'afiq@example.com', '$2y$10$rezod81V4ILNsK3Cmf11Feo8FlRqmO6Pb.0JXJY9udBNJ2QwBUXPi', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:41:58'),
+(4, 'afiq2', 'afiq2', 'afiq2@example.com', '$2y$10$m/seoYYNQXgY0UFjEAz0a.TtB5qiaSp0CtebZ46PlsMWEjnezdYoO', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:08'),
+(5, 'Muhammad Afiq', 'Muhammad Afiq', 'muhammadafiqnazmi2003@gmail.com', '$2y$10$2Q6Q9BGIS8HeUUf4.SF3IOKwgrM8Z4ntBEgI/N.Mmq7KASLx1CfdG', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-23 09:47:42'),
+(6, 'Assyabil', 'Assyabil', 'abilkry@gmail.com', '$2y$10$NIFNXbGErITAFUcPai68se7PQHsLa/7AlrFoqmLagnAfSkb2ka8Uu', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-24 16:50:11'),
+(7, 'Afiq Nazmi', 'Afiq Nazmi', 'afiqnazmi17@icloud.com', '$2y$10$ymq6UL58EOS74ZLCgBlwx.Z3/2Cw3mnEaKqkEe6vo2KM/WEOHJFG2', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-27 23:17:12'),
+(8, 'Muhammad Afiq Nazmi Bin Sulaiman', 'Muhammad Afiq Nazmi Bin Sulaiman', 'afiqnzmi@gmail.com', '$2y$10$ihYrNLR5FYFh.bcv9Upk8.FLsrwibO4p4I0cU6DrUcuDTQIo3iCVS', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-28 23:05:49'),
+(9, 'Amier', 'Amier', 'cuteamier@gmail.com', '$2y$10$HMLA4GaC2uS/Tbe10gIPFuJ.R.DdLH2LYxNeBM3Aq42fIt7SHad.2', NULL, NULL, NULL, NULL, NULL, 1, 0, 'en', NULL, NULL, NULL, '2025-10-29 10:45:52');
 
 --
 -- Indexes for dumped tables

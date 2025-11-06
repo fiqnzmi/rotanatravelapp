@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -26,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e))));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -34,23 +35,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return Scaffold(
       appBar: AppBar(title: const Text('Reset Password')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
         children: [
-          const Text('Enter your email address or username. We’ll send a 6-digit code to verify it’s you.',
-              style: TextStyle(color: Colors.black54)),
+          Text(
+            'Enter your email address or username. We’ll send a 6-digit code to verify it’s you.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: idC,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
               labelText: 'Email Address or Username',
-              filled: true, fillColor: Colors.white,
+              filled: true,
+              fillColor: fillColor,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
             ),
           ),
           const SizedBox(height: 16),

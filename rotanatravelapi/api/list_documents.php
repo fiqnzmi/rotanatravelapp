@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php'; require_once 'helpers.php';
+require_once 'config.php';
 $bookingId = isset($_GET['booking_id']) ? (int)$_GET['booking_id'] : 0;
 $userId    = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 if ($bookingId<=0) fail('Missing booking_id');
@@ -21,9 +22,20 @@ if (!$rows) {
   ];
   foreach ($required as $r) {
     $pdo->prepare("INSERT INTO documents (booking_id,user_id,doc_type,label,status,file_path) VALUES (?,?,?,?,?,?)")
-        ->execute([$bookingId,$userId,$r[0],$r[1],'ACTIVE','']);
+        ->execute([$bookingId,$userId,$r[0],$r[1],'REQUIRED',null]);
   }
   $docs->execute([$bookingId,$userId]);
   $rows = $docs->fetchAll();
 }
+$baseUrl = $UPLOAD_URL ? rtrim($UPLOAD_URL, '/') : null;
+foreach ($rows as &$row) {
+  $path = $row['file_path'] ?? '';
+  if ($baseUrl && $path) {
+    $row['file_url'] = $baseUrl . '/' . ltrim($path, '/');
+  } else {
+    $row['file_url'] = null;
+  }
+}
+unset($row);
+
 ok($rows);

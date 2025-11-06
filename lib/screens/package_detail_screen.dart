@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/booking_service.dart';
 import '../models/package_detail.dart';
+import '../utils/error_utils.dart';
+import '../widgets/no_connection_view.dart';
 import 'booking_wizard_screen.dart';
 
 class PackageDetailScreen extends StatefulWidget {
@@ -24,6 +27,13 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> with TickerPr
     return PackageDetail.fromJson(data);
   }
 
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,7 +42,13 @@ class _PackageDetailScreenState extends State<PackageDetailScreen> with TickerPr
           future: _future,
           builder: (ctx, snap) {
             if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-            if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+            if (snap.hasError) {
+              final error = snap.error;
+              if (error is NoConnectionException) {
+                return Center(child: NoConnectionView(onRetry: _reload));
+              }
+              return Center(child: Text('Error: ${friendlyError(error ?? 'Unknown error')}'));
+            }
             final p = snap.data!;
             return _Body(detail: p);
           },
@@ -58,6 +74,9 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final p = widget.detail;
     final money = NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 0);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
 
     return Stack(
       children: [
@@ -86,41 +105,60 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                   aspectRatio: 16 / 9,
                   child: (p.images.isNotEmpty)
                       ? PageView(children: p.images.map((u) => Image.network(u, fit: BoxFit.cover)).toList())
-                      : Container(color: const Color(0xFFE9EDF2), child: const Center(child: Text('Premium Umrah Package Gallery'))),
+                      : Container(
+                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(
+                                Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.75,
+                              ),
+                          child: Center(
+                            child: Text(
+                              'Premium Umrah Package Gallery',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(p.title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                Text(p.title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Row(children: [
                   const Icon(Icons.star_rounded, color: Color(0xFFFFB800), size: 18),
                   const SizedBox(width: 4),
                   Text('${(p.ratingAvg ?? 0).toStringAsFixed(1)} ${p.ratingCount != null ? '(${p.ratingCount})' : ''}',
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 10),
                 Row(children: [
-                  const Icon(Icons.event_outlined, size: 18, color: Colors.black54),
+                  Icon(Icons.event_outlined, size: 18, color: muted),
                   const SizedBox(width: 6),
-                  Text('${p.durationDays ?? 0} days', style: const TextStyle(color: Colors.black87)),
+                  Text(
+                    '${p.durationDays ?? 0} days',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                  ),
                   const SizedBox(width: 16),
-                  const Icon(Icons.place_outlined, size: 18, color: Colors.black54),
+                  Icon(Icons.place_outlined, size: 18, color: muted),
                   const SizedBox(width: 6),
-                  Text(p.cities ?? '-', style: const TextStyle(color: Colors.black87)),
+                  Text(
+                    p.cities ?? '-',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                  ),
                 ]),
                 const SizedBox(height: 14),
                 Text('From ${money.format(p.price)}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               ]),
             ),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('Available Departures',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
             ),
             const SizedBox(height: 8),
             ...p.departures.map((d) => _DepartureCard(dep: d)).toList(),
@@ -173,26 +211,36 @@ class _DepartureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final money = NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 0);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
     Widget priceRow(DepartureTier t) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t.name, style: const TextStyle(color: Colors.black54)),
+          Text(t.name, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
           const SizedBox(height: 4),
-          Text(money.format(t.price), style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(money.format(t.price), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
         ]);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, 8))],
       ),
       child: Column(children: [
         Row(children: [
           Text(DateFormat('MMMM d, yyyy').format(DateTime.parse(dep.date)),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const Spacer(),
-          if ((dep.note ?? '').isNotEmpty) Text(dep.note!, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)),
+          if ((dep.note ?? '').isNotEmpty)
+            Text(
+              dep.note!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
         ]),
         const SizedBox(height: 12),
         Row(children: [

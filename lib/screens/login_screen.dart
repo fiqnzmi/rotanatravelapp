@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -37,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -46,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Log In')),
       body: ListView(
@@ -55,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
             margin: const EdgeInsets.only(bottom: 24),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(
@@ -81,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 4),
                 Text('Log In',
                     style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: Colors.black54)),
+                        ?.copyWith(color: scheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -97,7 +99,10 @@ class _LoginScreenState extends State<LoginScreen> {
             obscure: obscure,
             suffix: IconButton(
               onPressed: () => setState(() => obscure = !obscure),
-              icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+              icon: Icon(
+                obscure ? Icons.visibility : Icons.visibility_off,
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -153,6 +158,13 @@ class _LoginScreenState extends State<LoginScreen> {
     Widget? suffix,
     TextInputType? keyboard,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return TextField(
       controller: controller,
       obscureText: obscure,
@@ -160,16 +172,16 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: fillColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: borderColor),
         ),
         suffixIcon: suffix,
       ),

@@ -6,7 +6,7 @@ if ($userId<=0) {
   $userId = 1;
 }
 $pdo = db();
-$user = $pdo->prepare("SELECT id, username, name, email, phone, notify_email, notify_sms, preferred_language, emergency_contact_id, profile_photo, profile_photo_url FROM users WHERE id=?");
+$user = $pdo->prepare("SELECT id, username, name, email, phone, gender, dob, passport_no, address, notify_email, notify_sms, preferred_language, emergency_contact_id, profile_photo, profile_photo_url FROM users WHERE id=?");
 $user->execute([$userId]); $u = $user->fetch();
 
 if ($u) {
@@ -21,6 +21,14 @@ if ($u) {
   $u['language'] = $u['preferred_language'] ?: null;
   if (!isset($u['phone'])) {
     $u['phone'] = null;
+  }
+  $u['gender'] = $u['gender'] ?? null;
+  $u['passport_no'] = $u['passport_no'] ?? null;
+  $u['address'] = $u['address'] ?? null;
+  if (!empty($u['dob'])) {
+    $u['dob'] = date('Y-m-d', strtotime($u['dob']));
+  } else {
+    $u['dob'] = null;
   }
 }
 
@@ -40,4 +48,12 @@ if ($u && !empty($u['emergency_contact_id'])) {
   $emergency = $em->fetch() ?: null;
 }
 
-ok(['user'=>$u, 'counts'=>$counts, 'family_members'=>$m, 'emergency_contact'=>$emergency]);
+$privacy = fetch_privacy_settings($pdo, $userId);
+
+ok([
+  'user'=>$u,
+  'counts'=>$counts,
+  'family_members'=>$m,
+  'emergency_contact'=>$emergency,
+  'privacy_settings' => $privacy,
+]);

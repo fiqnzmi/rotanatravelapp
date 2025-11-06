@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String token;
@@ -35,7 +36,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       Navigator.popUntil(context, (r) => r.isFirst);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e))));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -44,12 +45,23 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final hintDev = widget.debugCode==null ? '' : ' (DEV code: ${widget.debugCode})';
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
+    final muted = scheme.onSurfaceVariant;
     return Scaffold(
       appBar: AppBar(title: const Text('Enter Code')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
         children: [
-          Text('We sent a 6-digit code to ${widget.contactMask}.$hintDev', style: const TextStyle(color: Colors.black54)),
+          Text(
+            'We sent a 6-digit code to ${widget.contactMask}.$hintDev',
+            style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: codeC,
@@ -58,10 +70,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             decoration: InputDecoration(
               labelText: '6-digit Code',
               counterText: '',
-              filled: true, fillColor: Colors.white,
+              filled: true,
+              fillColor: fillColor,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -69,11 +88,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             controller: passC, obscureText: o1,
             decoration: InputDecoration(
               labelText: 'New Password',
-              filled: true, fillColor: Colors.white,
+              filled: true,
+              fillColor: fillColor,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-              suffixIcon: IconButton(onPressed: ()=>setState(()=>o1=!o1), icon: Icon(o1?Icons.visibility:Icons.visibility_off)),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              suffixIcon: IconButton(
+                onPressed: ()=>setState(()=>o1=!o1),
+                icon: Icon(o1?Icons.visibility:Icons.visibility_off, color: muted),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -81,11 +110,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             controller: pass2C, obscureText: o2,
             decoration: InputDecoration(
               labelText: 'Confirm Password',
-              filled: true, fillColor: Colors.white,
+              filled: true,
+              fillColor: fillColor,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-              suffixIcon: IconButton(onPressed: ()=>setState(()=>o2=!o2), icon: Icon(o2?Icons.visibility:Icons.visibility_off)),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              suffixIcon: IconButton(
+                onPressed: ()=>setState(()=>o2=!o2),
+                icon: Icon(o2?Icons.visibility:Icons.visibility_off, color: muted),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: borderColor),
+              ),
             ),
           ),
           const SizedBox(height: 16),

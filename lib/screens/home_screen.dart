@@ -12,6 +12,7 @@ import '../config_service.dart';
 import '../services/prayer_times_service.dart';
 import '../services/dashboard_service.dart';
 import '../utils/json_utils.dart';
+import '../utils/error_utils.dart';
 import 'trips_screen.dart';
 import 'documents_screen.dart';
 import 'payments_screen.dart';
@@ -93,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _userId = null;
         _nextTripBooking = null;
         _nextTripSummary = null;
-        _nextTripSummaryError = '$e';
+        _nextTripSummaryError = friendlyError(e);
         _nextTripSummaryLoading = false;
         _nextTripSummaryBookingId = null;
       });
@@ -183,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _nextTripSummary = null;
-        _nextTripSummaryError = '$e';
+        _nextTripSummaryError = friendlyError(e);
         _nextTripSummaryLoading = false;
       });
     }
@@ -407,9 +408,9 @@ class _HomeScreenState extends State<HomeScreen> {
           (chip) => _statusChip(
             chip.icon,
             chip.label,
-            background: chip.background ?? const Color(0xFFE9EDF2),
-            iconColor: chip.iconColor ?? Colors.black87,
-            textColor: chip.textColor ?? Colors.black87,
+            background: chip.background,
+            iconColor: chip.iconColor,
+            textColor: chip.textColor,
           ),
         )
         .toList();
@@ -566,7 +567,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final bg = background ?? scheme.surfaceVariant.withOpacity(0.65);
+    final bg = background ??
+        scheme.surfaceVariant.withOpacity(
+          theme.brightness == Brightness.dark ? 0.35 : 0.65,
+        );
     final iconClr = iconColor ?? scheme.onSurfaceVariant;
     final textClr = textColor ?? scheme.onSurfaceVariant;
     return Container(
@@ -627,6 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNextTripCard(BuildContext context, Booking? nextTrip) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final countdown = _nextTripCountdown();
     final departureLabel = _nextTripDepartureLabel();
     final chips = _nextTripChipWidgets();
@@ -664,7 +669,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 6),
           Text(
             'Secure your spot on the next departure and we\'ll keep a countdown here.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -697,7 +703,8 @@ class _HomeScreenState extends State<HomeScreen> {
             else if (countdown != null)
               Text(
                 countdown,
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
           ],
         ),
@@ -710,7 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 4),
           Text(
             departureLabel,
-            style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
         if (summaryError != null && !summaryLoading) ...[
@@ -741,7 +749,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       Text(
                         summaryError,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                       TextButton.icon(
                         onPressed: _retryLoadNextTripSummary,
@@ -776,7 +785,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 6),
             Text(
               '${steps.completed} of ${steps.total} tasks completed',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -963,6 +973,8 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
+        final bottomTheme = Theme.of(sheetContext);
+        final mutedColor = bottomTheme.colorScheme.onSurfaceVariant;
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           child: Column(
@@ -972,8 +984,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 8),
               Text(
                 'Welcome to Rotana',
-                style: Theme.of(parentContext)
-                    .textTheme
+                style: bottomTheme.textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
@@ -981,10 +992,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 'Log in to manage trips, payments and documents.',
                 textAlign: TextAlign.center,
-                style: Theme.of(parentContext)
-                    .textTheme
+                style: bottomTheme.textTheme
                     .bodyMedium
-                    ?.copyWith(color: Colors.black54),
+                    ?.copyWith(color: mutedColor),
               ),
               const SizedBox(height: 16),
 
@@ -1048,6 +1058,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required num price,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accentBackground = scheme.surfaceVariant.withOpacity(
+      isDark ? 0.35 : 0.75,
+    );
     final formatter =
         NumberFormat.currency(locale: 'ms_MY', symbol: 'RM ', decimalDigits: 0);
     return InkWell(
@@ -1055,7 +1071,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       child: Ink(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
             BoxShadow(color: Color(0x12000000), blurRadius: 14, offset: Offset(0, 8))
@@ -1068,14 +1084,18 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 flex: 5,
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE9EDF2),
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    color: accentBackground,
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(18),
                       bottomLeft: Radius.circular(18),
                     ),
                   ),
-                  child: const Icon(Icons.landscape_outlined, size: 40),
+                  child: Icon(
+                    Icons.landscape_outlined,
+                    size: 40,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               Expanded(
@@ -1086,20 +1106,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title,
-                          style: Theme.of(context)
-                              .textTheme
+                          style: theme.textTheme
                               .titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 4),
                       Text(subtitle,
-                          style: Theme.of(context)
-                              .textTheme
+                          style: theme.textTheme
                               .bodyMedium
-                              ?.copyWith(color: Colors.black54)),
+                              ?.copyWith(color: scheme.onSurfaceVariant)),
                       const Spacer(),
                       Text('From ${formatter.format(price)}',
-                          style: Theme.of(context)
-                              .textTheme
+                          style: theme.textTheme
                               .titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700)),
                     ],

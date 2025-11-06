@@ -60,7 +60,10 @@ function normalize_date_value($value) {
 function normalize_gender_value($value) {
   if ($value === null) return null;
   $lower = strtolower(trim((string)$value));
-  if ($lower === 'male' || $lower === 'female') return $lower;
+  if ($lower === '') return null;
+  if (in_array($lower, ['m', 'male'], true)) return 'male';
+  if (in_array($lower, ['f', 'female'], true)) return 'female';
+  if (in_array($lower, ['other', 'o'], true)) return 'other';
   return null;
 }
 
@@ -68,6 +71,74 @@ function normalize_relationship_value($value) {
   $allowed = ['SPOUSE','CHILD','PARENT','SIBLING','FRIEND','OTHER'];
   $upper = strtoupper(trim((string)$value));
   return in_array($upper, $allowed, true) ? $upper : 'OTHER';
+}
+
+function normalize_bool_value($value, $default = null) {
+  if (is_bool($value)) return $value;
+  if (is_int($value)) {
+    if ($value === 1) return true;
+    if ($value === 0) return false;
+  }
+  if (is_string($value)) {
+    $lower = strtolower(trim($value));
+    if (in_array($lower, ['1','true','yes','y','on'], true)) return true;
+    if (in_array($lower, ['0','false','no','n','off'], true)) return false;
+  }
+  return $default;
+}
+
+function ensure_user_settings_table(PDO $pdo): void {
+  static $created = false;
+  if ($created) {
+    return;
+  }
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id INT NOT NULL PRIMARY KEY,
+      settings_json JSON NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_user_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  ");
+  $created = true;
+}
+
+function fetch_privacy_settings(PDO $pdo, int $userId): array {
+  ensure_user_settings_table($pdo);
+  $defaults = [
+    'two_factor' => false,
+    'biometric_login' => false,
+    'trusted_devices' => true,
+    'personalized_recommendations' => true,
+  ];
+  $stmt = $pdo->prepare("SELECT settings_json FROM user_settings WHERE user_id = ? LIMIT 1");
+  $stmt->execute([$userId]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+  if ($row && !empty($row['settings_json'])) {
+    $json = json_decode($row['settings_json'], true);
+    if (is_array($json)) {
+      foreach ($defaults as $key => $default) {
+        if (array_key_exists($key, $json)) {
+          $defaults[$key] = (bool)$json[$key];
+        }
+      }
+    }
+  }
+  return $defaults;
+}
+
+function save_privacy_settings(PDO $pdo, int $userId, array $settings): void {
+  ensure_user_settings_table($pdo);
+  $stmt = $pdo->prepare("
+    INSERT INTO user_settings (user_id, settings_json)
+    VALUES (?, ?)
+    ON DUPLICATE KEY UPDATE settings_json = VALUES(settings_json), updated_at = CURRENT_TIMESTAMP
+  ");
+  $stmt->execute([
+    $userId,
+    json_encode($settings, JSON_UNESCAPED_UNICODE),
+  ]);
 }
 
 function normalize_key_identifier(string $key): string {

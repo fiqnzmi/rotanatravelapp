@@ -50,6 +50,10 @@ class _ToyyibpayCheckoutScreenState extends State<ToyyibpayCheckoutScreen> {
           },
           onPageFinished: (_) => setState(() => _isLoading = false),
           onWebResourceError: (error) {
+            // -999 is NSURLErrorCancelled on iOS, which fires during legitimate redirects.
+            if (Platform.isIOS && error.errorCode == -999) {
+              return;
+            }
             setState(() {
               final buffer = StringBuffer(error.description);
               buffer.write(' (code: ${error.errorCode})');

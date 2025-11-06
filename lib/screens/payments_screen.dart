@@ -2,10 +2,13 @@
 import 'package:intl/intl.dart';
 
 import '../config_service.dart';
-import '../utils/json_utils.dart';
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/payment_service.dart';
 import '../services/toyyibpay_service.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
+import '../utils/json_utils.dart';
+import '../widgets/no_connection_view.dart';
 import 'payment_confirmation_screen.dart';
 import 'toyyibpay_checkout_screen.dart';
 
@@ -119,7 +122,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 );
                 recorded = true;
           } catch (e) {
-            recordError = e.toString();
+            recordError = friendlyError(e);
           }
         }
 
@@ -147,7 +150,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       } finally {
         if (mounted) setState(() => _gatewayLoading = false);
@@ -196,7 +199,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            final error = snapshot.error;
+            if (error is NoConnectionException) {
+              return Center(child: NoConnectionView(onRetry: () { _refresh(); }));
+            }
+            return Center(child: Text('Error: ${friendlyError(error ?? 'Unknown error')}'));
           }
 
           final data = snapshot.data ?? const <String, dynamic>{};

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/booking_service.dart';
 import '../services/dashboard_service.dart';
 import '../services/auth_service.dart';
 import '../utils/json_utils.dart';
+import '../utils/error_utils.dart';
 import '../models/booking.dart';
+import '../widgets/no_connection_view.dart';
 import 'documents_screen.dart';
 import 'payments_screen.dart';
 import 'login_screen.dart';
@@ -34,6 +37,13 @@ class _TripsScreenState extends State<TripsScreen> {
     }
     final bookings = await _svc.myBookings();
     return _TripsResult(loggedIn: true, bookings: bookings);
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
   }
 
   Widget _stepsBar(BuildContext context, List<Map<String, dynamic>> steps) {
@@ -81,7 +91,7 @@ class _TripsScreenState extends State<TripsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to load booking details: $e')),
+        SnackBar(content: Text('Unable to load booking details: ${friendlyError(e)}')),
       );
       return;
     }
@@ -133,7 +143,11 @@ class _TripsScreenState extends State<TripsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snap.hasError) {
-              return Center(child: Text('Error: ${snap.error}'));
+              final error = snap.error;
+              if (error is NoConnectionException) {
+                return Center(child: NoConnectionView(onRetry: _reload));
+              }
+              return Center(child: Text('Error: ${friendlyError(error ?? 'Unknown error')}'));
             }
             final result = snap.data as _TripsResult;
             if (!result.loggedIn) {
@@ -144,7 +158,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   ),
                 );
                 if (loggedIn == true && mounted) {
-                  setState(() => _future = _load());
+                  _reload();
                 }
               });
             }
@@ -182,7 +196,21 @@ class _TripsScreenState extends State<TripsScreen> {
                 future: AuthService.instance.getUserId().then((uid)=>_dash.bookingSummary(b.id, uid ?? 0)),
                 builder: (_, snap) {
                   if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator(minHeight: 6);
-                  if (snap.hasError) return const SizedBox.shrink();
+                  if (snap.hasError) {
+                    final error = snap.error;
+                    if (error is NoConnectionException) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Text(
+                          NoConnectionException.defaultMessage,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }
                   final steps = (snap.data!['steps'] as List).cast<Map<String,dynamic>>();
                   return _stepsBar(context, steps);
                 },
@@ -356,6 +384,9 @@ class _BookingDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
     final steps = (summary['steps'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e as Map))
@@ -393,7 +424,7 @@ class _BookingDetailSheet extends StatelessWidget {
               ),
               Text(
                 booking.title,
-                style: Theme.of(context)
+                style: theme
                     .textTheme
                     .titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800),
@@ -401,19 +432,19 @@ class _BookingDetailSheet extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 'Booking #${booking.id} • Created ${fmt.format(created)}',
-                style: Theme.of(context)
+                style: theme
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: Colors.black54),
+                    ?.copyWith(color: muted),
               ),
               if (travelDate != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   'Travel date: ${fmt.format(travelDate)}',
-                  style: Theme.of(context)
+                  style: theme
                       .textTheme
                       .bodySmall
-                      ?.copyWith(color: Colors.black54),
+                      ?.copyWith(color: muted),
                 ),
               ],
               const SizedBox(height: 18),
@@ -424,9 +455,9 @@ class _BookingDetailSheet extends StatelessWidget {
                 onOpenBriefing: (step) => _showBriefing(context, step),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Quick actions',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
               Wrap(
@@ -523,12 +554,18 @@ class _BookingDetailSheet extends StatelessWidget {
             if (notes.isNotEmpty)
               Text(
                 notes,
-                style: const TextStyle(color: Colors.black87),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
               )
             else
-              const Text(
+              Text(
                 'Your travel consultant will share the briefing details soon.',
-                style: TextStyle(color: Colors.black54),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
           ],
         ),
@@ -562,12 +599,17 @@ class _BookingTimeline extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F7FA),
+          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(
+                Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.65,
+              ),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Text(
+        child: Text(
           'We\'ll update your booking timeline as soon as new actions are available.',
-          style: TextStyle(color: Colors.black54),
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
     }
@@ -606,6 +648,15 @@ class _TimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = scheme.onSurfaceVariant;
+    final successColor = const Color(0xFF1B8730);
+    final successContainer = scheme.secondaryContainer;
+    final pendingContainer = scheme.secondary.withOpacity(
+      theme.brightness == Brightness.dark ? 0.35 : 0.15,
+    );
+    final timelineSurface = theme.cardColor;
     final slug = _stepSlug(step);
     final done = _stepDone(step);
     final statusText = _stepStatusText(step, done);
@@ -625,7 +676,7 @@ class _TimelineItem extends StatelessWidget {
       dateColor = const Color(0xFFB35C00);
     } else if (scheduled != null) {
       dateLabel = fmt.format(scheduled);
-      dateColor = Colors.black54;
+      dateColor = muted;
     }
 
     final actionLabelRaw = step['action_label'] ??
@@ -659,11 +710,11 @@ class _TimelineItem extends StatelessWidget {
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: done ? const Color(0xFF1B8730) : Colors.white,
+                  color: done ? successColor : timelineSurface,
                   border: Border.all(
                     color: done
-                        ? const Color(0xFF1B8730)
-                        : const Color(0xFF94A3B8),
+                        ? successColor
+                        : scheme.outlineVariant,
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(9),
@@ -674,7 +725,7 @@ class _TimelineItem extends StatelessWidget {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.symmetric(vertical: 2),
-                    color: const Color(0xFFE2E8F0),
+                    color: scheme.outlineVariant.withOpacity(0.5),
                   ),
                 ),
             ],
@@ -685,12 +736,12 @@ class _TimelineItem extends StatelessWidget {
               margin: EdgeInsets.only(bottom: isLast ? 0 : 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: timelineSurface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: done
-                      ? const Color(0xFF8DD7A5)
-                      : const Color(0xFFE2E8F0),
+                      ? successColor.withOpacity(0.45)
+                      : scheme.outlineVariant,
                 ),
                 boxShadow: const [
                   BoxShadow(
@@ -709,9 +760,7 @@ class _TimelineItem extends StatelessWidget {
                       Icon(
                         icon,
                         size: 24,
-                        color: done
-                            ? const Color(0xFF1B8730)
-                            : const Color(0xFF0B53B0),
+                        color: done ? successColor : scheme.primary,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -720,33 +769,23 @@ class _TimelineItem extends StatelessWidget {
                           children: [
                             Text(
                               _stepLabel(step),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: done
-                                        ? const Color(0xFFE6F6EA)
-                                        : const Color(0xFFE7F0FF),
+                                    color: done ? successContainer : pendingContainer,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
                                     statusText,
-                                    style: TextStyle(
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: done
-                                          ? const Color(0xFF177245)
-                                          : const Color(0xFF0B53B0),
+                                      color: done ? successColor : scheme.primary,
                                     ),
                                   ),
                                 ),
@@ -755,8 +794,8 @@ class _TimelineItem extends StatelessWidget {
                                   Flexible(
                                     child: Text(
                                       dateLabel,
-                                      style: TextStyle(
-                                        color: dateColor ?? Colors.black54,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: dateColor ?? muted,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -773,7 +812,7 @@ class _TimelineItem extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       notes,
-                      style: const TextStyle(color: Colors.black87),
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
                     ),
                   ],
                   if (actionCallback != null && actionLabel != null) ...[
@@ -831,6 +870,8 @@ class _TripsLoginPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
       child: Column(
@@ -847,10 +888,10 @@ class _TripsLoginPrompt extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Save bookings, track progress, and manage documents once you sign in.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54),
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           FilledButton(

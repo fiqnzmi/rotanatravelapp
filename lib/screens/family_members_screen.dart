@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/family_service.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
 import '../utils/json_utils.dart';
+import '../widgets/no_connection_view.dart';
 
 Future<bool> showFamilyMemberForm(
   BuildContext context, {
@@ -146,7 +149,7 @@ class _FamilyMemberFormSheetState extends State<_FamilyMemberFormSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      _showSnack('Failed to save: $e');
+      _showSnack('Failed to save: ${friendlyError(e)}');
     }
   }
 
@@ -351,6 +354,13 @@ class _DateFieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('dd/MM/yyyy');
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fillColor = theme.inputDecorationTheme.fillColor ??
+        (theme.brightness == Brightness.dark
+            ? scheme.surfaceVariant.withOpacity(0.55)
+            : scheme.surface);
+    final borderColor = scheme.outlineVariant;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -359,8 +369,8 @@ class _DateFieldRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 58),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD9DFE8)),
-          color: Colors.white,
+          border: Border.all(color: borderColor),
+          color: fillColor,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -368,9 +378,9 @@ class _DateFieldRow extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 12,
-                color: Colors.black54,
+                color: scheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -379,7 +389,9 @@ class _DateFieldRow extends StatelessWidget {
               value == null ? 'Select date' : formatter.format(value!),
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: value == null ? Colors.black45 : Colors.black87,
+                color: value == null
+                    ? scheme.onSurfaceVariant.withOpacity(0.6)
+                    : scheme.onSurface,
               ),
             ),
           ],
@@ -416,9 +428,17 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
   }
 
   Future<void> _delete(int id) async {
-    final uid = await AuthService.instance.getUserId() ?? 0;
-    await _svc.delete(id, uid);
-    _reload();
+    try {
+      final uid = await AuthService.instance.getUserId() ?? 0;
+      await _svc.delete(id, uid);
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: ${friendlyError(e)}')),
+      );
+    }
   }
 
   @override
@@ -433,7 +453,13 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
         future: _future,
         builder: (_, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+          if (snap.hasError) {
+            final error = snap.error;
+            if (error is NoConnectionException) {
+              return Center(child: NoConnectionView(onRetry: () { _reload(); }));
+            }
+            return Center(child: Text('Error: ${friendlyError(error ?? 'Unknown error')}'));
+          }
           final items = (snap.data as List<Map<String, dynamic>>);
           if (items.isEmpty) return const Center(child: Text('No family members yet'));
           return ListView.separated(

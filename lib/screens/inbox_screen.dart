@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/api_client.dart' show NoConnectionException;
 import '../services/dashboard_service.dart';
 import '../services/auth_service.dart';
+import '../utils/error_utils.dart';
+import '../widgets/no_connection_view.dart';
 import 'login_screen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -33,6 +36,13 @@ class _InboxScreenState extends State<InboxScreen> {
     return _InboxResult(loggedIn: true, notifications: data);
   }
 
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -47,7 +57,11 @@ class _InboxScreenState extends State<InboxScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
+            final error = snap.error;
+            if (error is NoConnectionException) {
+              return Center(child: NoConnectionView(onRetry: _reload));
+            }
+            return Center(child: Text('Error: ${friendlyError(error ?? 'Unknown error')}'));
           }
           final result = snap.data as _InboxResult;
           if (!result.loggedIn) {
@@ -58,7 +72,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
               );
               if (loggedIn == true && mounted) {
-                setState(() => _future = _load());
+                _reload();
               }
             });
           }

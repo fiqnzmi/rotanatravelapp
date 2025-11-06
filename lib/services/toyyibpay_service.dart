@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
 import '../config_service.dart';
+import 'api_client.dart';
 
 class ToyyibpayBill {
   ToyyibpayBill({
@@ -44,11 +47,12 @@ class ToyyibpayService {
         'callback_url': ConfigService.toyyibpayCallbackUrl,
     };
 
-    final res = await _client.post(
-      _endpoint('toyyibpay_create_bill.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    try {
+      final res = await _client.post(
+        _endpoint('toyyibpay_create_bill.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
 
     final decoded = jsonDecode(res.body);
     if (res.statusCode >= 200 &&
@@ -82,6 +86,11 @@ class ToyyibpayService {
       throw Exception(error ?? 'Toyyibpay bill request failed (HTTP ${res.statusCode})');
     }
 
-    throw Exception('Toyyibpay bill request failed (HTTP ${res.statusCode})');
+      throw Exception('Toyyibpay bill request failed (HTTP ${res.statusCode})');
+    } on SocketException catch (_) {
+      throw const NoConnectionException();
+    } on http.ClientException catch (_) {
+      throw const NoConnectionException();
+    }
   }
 }

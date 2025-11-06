@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config_service.dart';
 import '../utils/json_utils.dart';
+import 'api_client.dart';
 
 class AuthService {
   AuthService._();
@@ -16,6 +19,20 @@ class AuthService {
   static const _keyPhoto = 'user_photo';
 
   Uri _u(String path) => Uri.parse('${ConfigService.apiBase}/$path');
+
+  Future<http.Response> _post(String path, Map<String, dynamic> body) async {
+    try {
+      return await http.post(
+        _u(path),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+    } on SocketException catch (_) {
+      throw const NoConnectionException();
+    } on http.ClientException catch (_) {
+      throw const NoConnectionException();
+    }
+  }
 
   Map<String, dynamic> _decodeResponse(http.Response res) {
     final body = res.body.trim();
@@ -82,11 +99,7 @@ class AuthService {
   }
 
   Future<void> register({required String username, required String email, required String password}) async {
-    final res = await http.post(
-      _u('register.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'email': email, 'password': password}),
-    );
+    final res = await _post('register.php', {'username': username, 'email': email, 'password': password});
     final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
       final u = Map<String, dynamic>.from(m['data']['user'] as Map);
@@ -122,11 +135,7 @@ class AuthService {
   }
 
   Future<void> login({required String identifier, required String password}) async {
-    final res = await http.post(
-      _u('login.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'identifier': identifier, 'password': password}),
-    );
+    final res = await _post('login.php', {'identifier': identifier, 'password': password});
     final m = _decodeResponse(res);
     if (res.statusCode >= 200 && res.statusCode < 300 && m['success'] == true) {
       final u = Map<String, dynamic>.from(m['data']['user'] as Map);
@@ -166,11 +175,7 @@ class AuthService {
 
   // RESET PASSWORD FLOW
   Future<Map<String, dynamic>> requestPasswordReset(String identifier) async {
-    final res = await http.post(
-      _u('request_password_reset.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'identifier': identifier}),
-    );
+    final res = await _post('request_password_reset.php', {'identifier': identifier});
     final m = _decodeResponse(res);
     if (m['success'] == true) return Map<String, dynamic>.from(m['data']);
     throw Exception(m['error'] ?? 'Failed to request reset');
@@ -181,11 +186,7 @@ class AuthService {
     required String code,
     required String newPassword,
   }) async {
-    final res = await http.post(
-      _u('reset_password.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': token, 'code': code, 'new_password': newPassword}),
-    );
+    final res = await _post('reset_password.php', {'token': token, 'code': code, 'new_password': newPassword});
     final m = _decodeResponse(res);
     if (m['success'] != true) throw Exception(m['error'] ?? 'Failed to reset password');
   }
