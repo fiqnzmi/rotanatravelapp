@@ -12,10 +12,8 @@ import '../utils/error_utils.dart';
 import 'login_screen.dart';
 import 'family_members_screen.dart';
 import 'notification_settings_screen.dart';
-import 'payment_methods_screen.dart';
 import 'privacy_security_screen.dart';
 import 'help_support_screen.dart';
-import 'about_rotana_screen.dart';
 
 DateTime? _parseDate(dynamic value) {
   if (value == null) return null;
@@ -35,10 +33,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _family = FamilyService();
   final ImagePicker _picker = ImagePicker();
   late Future<_ProfileResult> _future;
-  bool _notifyEmail = true;
-  bool _notifySms = false;
-  bool _notificationsInitialized = false;
-  bool _notificationsSaving = false;
 
   @override
   void initState() {
@@ -166,84 +160,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<bool> _updateNotificationPref({bool? email, bool? sms, BuildContext? feedbackContext}) async {
-    if (_notificationsSaving) return false;
-    final ctx = feedbackContext ?? context;
-    final messenger = ScaffoldMessenger.of(ctx);
-    final loggedIn = await AuthService.instance.isLoggedIn();
-    if (!loggedIn) {
-      final ok = await Navigator.of(ctx).push<bool>(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      if (ok != true) return false;
-    }
-
-    final userId = await AuthService.instance.getUserId();
-    if (userId == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Please login to update notifications.')),
-      );
-      return false;
-    }
-
-    final prevEmail = _notifyEmail;
-    final prevSms = _notifySms;
-    final nextEmail = email ?? _notifyEmail;
-    final nextSms = sms ?? _notifySms;
-
-    setState(() {
-      _notifyEmail = nextEmail;
-      _notifySms = nextSms;
-      _notificationsSaving = true;
-    });
-
-    try {
-      await _svc.updateProfile({
-        'user_id': '$userId',
-        'notify_email': nextEmail ? '1' : '0',
-        'notify_sms': nextSms ? '1' : '0',
-      });
-      if (!mounted) return true;
-      setState(() {
-        _notificationsSaving = false;
-      });
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Notification preferences updated.')),
-      );
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      setState(() {
-        _notifyEmail = prevEmail;
-        _notifySms = prevSms;
-        _notificationsSaving = false;
-      });
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to update notifications: $e')),
-      );
-      return false;
-    }
-  }
-
   void _openNotificationSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => NotificationSettingsScreen(
-          initialEmail: _notifyEmail,
-          initialSms: _notifySms,
-          onEmailChanged: (value, ctx) =>
-              _updateNotificationPref(email: value, feedbackContext: ctx),
-          onSmsChanged: (value, ctx) =>
-              _updateNotificationPref(sms: value, feedbackContext: ctx),
-        ),
-      ),
-    );
-  }
-
-  void _openPaymentMethods() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PaymentMethodsScreen(),
+        builder: (_) => const NotificationSettingsScreen(),
       ),
     );
   }
@@ -264,11 +184,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _openAboutRotana() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const AboutRotanaScreen(),
+  Future<void> _handleSettingsTap() async {
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      if (ok == true && mounted) {
+        setState(() {
+          _future = _load();
+        });
+      }
+      if (ok != true) return;
+    }
+    if (!mounted) return;
+    await _showSettingsSheet();
+  }
+
+  Future<void> _showSettingsSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outline.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Quick Settings',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SettingsCard(
+                onNotifications: () {
+                  Navigator.of(sheetContext).pop();
+                  _openNotificationSettings();
+                },
+                onPrivacySecurity: () {
+                  Navigator.of(sheetContext).pop();
+                  _openPrivacySecurity();
+                },
+                onHelpSupport: () {
+                  Navigator.of(sheetContext).pop();
+                  _openHelpSupport();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -286,22 +267,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       loggedIn: true,
       payload: Map<String, dynamic>.from(payload),
     );
-  }
-
-  bool _readBool(dynamic value, {required bool fallback}) {
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    if (value is String) {
-      final trimmed = value.trim().toLowerCase();
-      if (trimmed.isEmpty) return fallback;
-      if (trimmed == '1' || trimmed == 'true' || trimmed == 'yes' || trimmed == 'y') {
-        return true;
-      }
-      if (trimmed == '0' || trimmed == 'false' || trimmed == 'no' || trimmed == 'n') {
-        return false;
-      }
-    }
-    return fallback;
   }
 
   String? _photoFromMap(Map<String, dynamic>? map) {
@@ -375,7 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxHeight: 1600,
                   imageQuality: 85,
                 );
-                if (picked != null) {
+                if (picked != null && sheetContext.mounted && mounted) {
                   setModalState(() {
                     selectedPhotoFile = File(picked.path);
                     previewPhotoUrl = null;
@@ -595,7 +560,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   firstDate: firstDate,
                                   lastDate: now,
                                 );
-                                if (picked != null) {
+                                if (picked != null && sheetContext.mounted && mounted) {
                                   setModalState(() {
                                     dobValue = picked;
                                     dobCleared = false;
@@ -645,7 +610,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? null
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
-                                FocusScope.of(sheetContext).unfocus();
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                if (!sheetContext.mounted || !mounted) return;
                                 setModalState(() => saving = true);
                                 try {
                                   final payload = <String, dynamic>{
@@ -682,6 +648,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   );
                                   final response =
                                       await _svc.updateProfile(payload);
+                                  if (!sheetContext.mounted) return;
                                   Map<String, dynamic> storedUser = {};
                                   if (response is Map<String, dynamic>) {
                                     storedUser = Map<String, dynamic>.from(response);
@@ -713,6 +680,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       userId: userIdInt,
                                       file: selectedPhotoFile!,
                                     );
+                                    if (!sheetContext.mounted) return;
                                     final uploadedPhoto = _photoFromMap(uploadData);
                                     if (uploadedPhoto != null) {
                                       finalPhotoUrl = uploadedPhoto;
@@ -726,9 +694,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     phone: updatedPhone,
                                     photoUrl: finalPhotoUrl ?? '',
                                   );
-                                  Navigator.of(sheetContext).pop(true);
+                                  if (!mounted) return;
+                                  await Navigator.of(parentContext).maybePop(true);
                                 } catch (e) {
-                                  setModalState(() => saving = false);
+                                  if (sheetContext.mounted) {
+                                    setModalState(() => saving = false);
+                                  }
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -790,7 +761,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profile'),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: _handleSettingsTap,
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Profile settings',
           ),
@@ -833,31 +804,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final emergency =
               Map<String, dynamic>.from(m['emergency_contact'] as Map? ?? const {});
 
-          if (!_notificationsInitialized) {
-            final emailPref = _readBool(
-              user['notify_email'] ??
-                  user['email_notifications'] ??
-                  user['pref_email'] ??
-                  user['notification_email'],
-              fallback: true,
-            );
-            final smsPref = _readBool(
-              user['notify_sms'] ??
-                  user['sms_notifications'] ??
-                  user['pref_sms'] ??
-                  user['notification_sms'],
-              fallback: false,
-            );
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              setState(() {
-                _notifyEmail = emailPref;
-                _notifySms = smsPref;
-                _notificationsInitialized = true;
-              });
-            });
-          }
-
           final photoUrl = _photoFromMap(user);
 
           return ListView(
@@ -894,14 +840,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onEdit: _chooseEmergencyContact,
               ),
               const SizedBox(height: 12),
-              _SettingsCard(
-                onNotifications: _openNotificationSettings,
-                onPaymentMethods: _openPaymentMethods,
-                onPrivacySecurity: _openPrivacySecurity,
-                onHelpSupport: _openHelpSupport,
-                onAbout: _openAboutRotana,
-              ),
-              const SizedBox(height: 18),
               _LogoutButton(
                 onLogout: () async {
                   await AuthService.instance.logout();
@@ -1378,17 +1316,13 @@ class _EmergencyContactCard extends StatelessWidget {
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({
     this.onNotifications,
-    this.onPaymentMethods,
     this.onPrivacySecurity,
     this.onHelpSupport,
-    this.onAbout,
   });
 
   final VoidCallback? onNotifications;
-  final VoidCallback? onPaymentMethods;
   final VoidCallback? onPrivacySecurity;
   final VoidCallback? onHelpSupport;
-  final VoidCallback? onAbout;
 
   @override
   Widget build(BuildContext context) {
@@ -1411,12 +1345,6 @@ class _SettingsCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           _SettingsTile(
-            icon: Icons.credit_card_outlined,
-            label: 'Payment Methods',
-            onTap: onPaymentMethods,
-          ),
-          const Divider(height: 1),
-          _SettingsTile(
             icon: Icons.lock_outline,
             label: 'Privacy & Security',
             onTap: onPrivacySecurity,
@@ -1426,12 +1354,6 @@ class _SettingsCard extends StatelessWidget {
             icon: Icons.support_agent_outlined,
             label: 'Help & Support',
             onTap: onHelpSupport,
-          ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            label: 'About Rotana',
-            onTap: onAbout,
           ),
         ],
       ),

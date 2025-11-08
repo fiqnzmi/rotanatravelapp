@@ -12,6 +12,10 @@ if (!isset($_FILES['file'])) {
 
 $bookingId = (int)$_POST['booking_id'];
 $userId = (int)$_POST['user_id'];
+if ($bookingId === 0 || $userId <= 0) {
+  fail('Invalid request.');
+}
+
 $docType = strtoupper(trim($_POST['doc_type']));
 $label = trim($_POST['label'] ?? $docType);
 
@@ -58,13 +62,16 @@ if (!@move_uploaded_file($_FILES['file']['tmp_name'], $targetPath)) {
 }
 
 $pdo = db();
-$bookingCheck = $pdo->prepare("SELECT id FROM bookings WHERE id=? AND user_id=? LIMIT 1");
-$bookingCheck->execute([$bookingId, $userId]);
-if (!$bookingCheck->fetchColumn()) {
+$context = fetch_booking_context($pdo, $bookingId, $userId);
+if (!$context['found']) {
   fail('Booking not found for this user.', 404);
 }
-$check = $pdo->prepare("SELECT id FROM documents WHERE booking_id=? AND user_id=? AND doc_type=? LIMIT 1");
-$check->execute([$bookingId, $userId, $docType]);
+
+$linkColumn = $context['kind'] === 'request' ? 'booking_request_id' : 'booking_id';
+$linkId = $context['kind'] === 'request' ? $context['request_id'] : $context['booking_id'];
+
+$check = $pdo->prepare("SELECT id FROM documents WHERE $linkColumn = ? AND user_id=? AND doc_type=? LIMIT 1");
+$check->execute([$linkId, $userId, $docType]);
 $exists = $check->fetchColumn();
 
 $relativePath = $filename;
@@ -95,15 +102,30 @@ if ($exists) {
   $documentId = (int)$exists;
 } else {
   $stmt = $pdo->prepare("
-    INSERT INTO documents (booking_id, user_id, doc_type, label, status, file_name, file_path, mime_type, uploaded_at)
-    VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)
+    INSERT INTO documents (booking_id, booking_request_id, user_id, doc_type, label, status, file_name, file_path, mime_type, uploaded_at)
+    VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)
   ");
-  $stmt->execute([$bookingId, $userId, $docType, $label, $originalName, $relativePath, $mimeType, $now]);
+  $stmt->execute([
+    $context['kind'] === 'request' ? null : $linkId,
+    $context['kind'] === 'request' ? $linkId : null,
+    $userId,
+    $docType,
+    $label,
+    $originalName,
+    $relativePath,
+    $mimeType,
+    $now,
+  ]);
   $documentId = (int)$pdo->lastInsertId();
 }
 
 $publicUrl = $UPLOAD_URL ? rtrim($UPLOAD_URL, '/') . '/' . ltrim($relativePath, '/')
   : null;
+
+$progress = null;
+if ($context['kind'] === 'request') {
+  $progress = refresh_booking_request_progress($pdo, $context['request_id']);
+}
 
 ok([
   'id' => $documentId,
@@ -115,4 +137,5 @@ ok([
   'file_url' => $publicUrl,
   'size' => $size,
   'mime_type' => $mimeType,
+  'progress' => $progress,
 ]);

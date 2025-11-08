@@ -13,6 +13,7 @@ class TravelPackage {
   final int? hotelStars;
   final double? ratingAvg;
   final String? coverImage;
+  final List<PackageDepartureSummary> departures;
 
   TravelPackage({
     required this.id,
@@ -25,6 +26,7 @@ class TravelPackage {
     this.hotelStars,
     this.ratingAvg,
     this.coverImage,
+    this.departures = const [],
   });
 
   factory TravelPackage.fromJson(Map<String, dynamic> j) => TravelPackage(
@@ -38,6 +40,10 @@ class TravelPackage {
         hotelStars: readIntOrNull(j['hotel_stars']),
         ratingAvg: readDoubleOrNull(j['rating_avg']),
         coverImage: _resolveCover(j['cover_image'], j['images']),
+        departures: (j['departures'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((m) => PackageDepartureSummary.fromJson(Map<String, dynamic>.from(m)))
+            .toList(),
       );
 }
 
@@ -66,4 +72,43 @@ String? _resolveCover(dynamic cover, dynamic images) {
   final resolvedImages = _resolveImages(images);
   if (resolvedImages.isNotEmpty) return resolvedImages.first;
   return null;
+}
+
+class PackageDepartureSummary {
+  final String date; // ISO-8601 string
+  final String? note;
+  final List<PackageTierSummary> tiers;
+
+  PackageDepartureSummary({
+    required this.date,
+    this.note,
+    required this.tiers,
+  });
+
+  factory PackageDepartureSummary.fromJson(Map<String, dynamic> j) => PackageDepartureSummary(
+        date: j['date']?.toString() ?? '',
+        note: j['note']?.toString(),
+        tiers: (j['tiers'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((m) => PackageTierSummary.fromJson(Map<String, dynamic>.from(m)))
+            .toList(),
+      );
+}
+
+class PackageTierSummary {
+  final String name;
+  final double price;
+  final int? roomsLeft;
+
+  PackageTierSummary({
+    required this.name,
+    required this.price,
+    this.roomsLeft,
+  });
+
+  factory PackageTierSummary.fromJson(Map<String, dynamic> j) => PackageTierSummary(
+        name: j['name']?.toString() ?? '',
+        price: readDouble(j['price']),
+        roomsLeft: readIntOrNull(j['rooms_left']),
+      );
 }

@@ -6,6 +6,7 @@ if ($userId<=0) {
   $userId = 1;
 }
 $pdo = db();
+ensure_booking_request_tables($pdo);
 $user = $pdo->prepare("SELECT id, username, name, email, phone, gender, dob, passport_no, address, notify_email, notify_sms, preferred_language, emergency_contact_id, profile_photo, profile_photo_url FROM users WHERE id=?");
 $user->execute([$userId]); $u = $user->fetch();
 
@@ -36,6 +37,7 @@ $counts = [
   'completed' => (int)$pdo->query("SELECT COUNT(*) c FROM bookings WHERE user_id=$userId AND status='COMPLETED'")->fetch()['c'],
   'upcoming'  => (int)$pdo->query("SELECT COUNT(*) c FROM bookings WHERE user_id=$userId AND status='CONFIRMED'")->fetch()['c'],
   'family_members' => (int)$pdo->query("SELECT COUNT(*) c FROM family_members WHERE user_id=$userId")->fetch()['c'],
+  'pending_requests' => (int)$pdo->query("SELECT COUNT(*) c FROM booking_requests WHERE user_id=$userId AND status IN ('NOT_CONFIRMED','AWAITING_REQUIREMENTS','READY_FOR_REVIEW')")->fetch()['c'],
 ];
 
 $members = $pdo->prepare("SELECT id, full_name, relationship FROM family_members WHERE user_id=? ORDER BY id DESC LIMIT 10");

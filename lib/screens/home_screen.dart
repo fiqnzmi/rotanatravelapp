@@ -159,12 +159,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Booking? _findNextTrip(List<Booking> bookings) {
-    final confirmed = bookings
-        .where((b) => b.status.toUpperCase() == 'CONFIRMED')
-        .toList();
-    if (confirmed.isEmpty) return null;
-    confirmed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    return confirmed.first;
+    final active = bookings.where((b) => _isUpcomingStatus(b.status)).toList();
+    if (active.isEmpty) return null;
+    active.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return active.first;
   }
 
   Future<void> _loadNextTripSummary(int bookingId, int userId) async {
@@ -502,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return false;
   }
 
-  bool _stepDone(Map<String, dynamic> step) {
+bool _stepDone(Map<String, dynamic> step) {
     final raw = step['done'] ?? step['completed'] ?? step['is_done'] ?? step['status'];
     if (raw is bool) return raw;
     if (raw is num) return raw != 0;
@@ -1129,6 +1127,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+bool _isUpcomingStatus(String status) {
+  final upper = status.toUpperCase();
+  const archived = {'CANCELLED', 'REJECTED', 'COMPLETED'};
+  return !archived.contains(upper);
 }
 class _NextTripChipData {
   const _NextTripChipData({

@@ -7,26 +7,50 @@ try {
   $input = read_json_body();
 
   $bookingId = (int)($input['booking_id'] ?? 0);
-  if ($bookingId <= 0) {
+  if ($bookingId === 0) {
     json_out(['success' => false, 'error' => 'booking_id is required'], 422);
   }
 
   $pdo = db();
-  $bookingStmt = $pdo->prepare("
-    SELECT b.id,
-           b.user_id,
-           b.total_amount,
-           b.departure_date,
-           u.name,
-           u.username,
-           u.email
-    FROM bookings b
-    JOIN users u ON u.id = b.user_id
-    WHERE b.id = ?
-    LIMIT 1
-  ");
-  $bookingStmt->execute([$bookingId]);
-  $booking = $bookingStmt->fetch();
+  $context = fetch_booking_context($pdo, $bookingId, null);
+  if (!$context['found']) {
+    json_out(['success' => false, 'error' => 'Booking not found'], 404);
+  }
+
+  if ($context['kind'] === 'request') {
+    $bookingStmt = $pdo->prepare("
+      SELECT r.id,
+             r.user_id,
+             r.total_amount,
+             r.departure_date,
+             u.name,
+             u.username,
+             u.email
+      FROM booking_requests r
+      JOIN users u ON u.id = r.user_id
+      WHERE r.id = ?
+      LIMIT 1
+    ");
+    $bookingStmt->execute([$context['request_id']]);
+    $booking = $bookingStmt->fetch();
+  } else {
+    $bookingStmt = $pdo->prepare("
+      SELECT b.id,
+             b.user_id,
+             b.total_amount,
+             b.departure_date,
+             u.name,
+             u.username,
+             u.email
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.id = ?
+      LIMIT 1
+    ");
+    $bookingStmt->execute([$context['booking_id']]);
+    $booking = $bookingStmt->fetch();
+  }
+
   if (!$booking) {
     json_out(['success' => false, 'error' => 'Booking not found'], 404);
   }
@@ -41,8 +65,12 @@ try {
     json_out(['success' => false, 'error' => 'Toyyibpay credentials are not configured'], 500);
   }
 
-  $billName = trim($input['bill_name'] ?? ('Booking #' . $bookingId));
-  $billDescription = trim($input['bill_description'] ?? ('Payment for booking #' . $bookingId));
+  $displayId = $context['kind'] === 'request'
+    ? booking_request_display_id($context['request_id'])
+    : $context['booking_id'];
+
+  $billName = trim($input['bill_name'] ?? ('Booking #' . $displayId));
+  $billDescription = trim($input['bill_description'] ?? ('Payment for booking #' . $displayId));
   $customerName = trim($input['customer_name'] ?? ($booking['name'] ?: $booking['username'] ?: 'Customer'));
   $customerEmail = trim($input['customer_email'] ?? $booking['email'] ?? '');
   if ($customerEmail === '') {
@@ -57,7 +85,8 @@ try {
     json_out(['success' => false, 'error' => 'customer_phone is required'], 422);
   }
   $dueDays = isset($input['due_in_days']) ? (int)$input['due_in_days'] : null;
-  $externalRef = $input['external_ref'] ?? ('BOOK-' . $bookingId . '-' . time());
+  $prefix = $context['kind'] === 'request' ? 'REQ-' . $context['request_id'] : 'BOOK-' . $context['booking_id'];
+  $externalRef = $input['external_ref'] ?? ($prefix . '-' . time());
 
   $billPayload = [
     'userSecretKey' => $TOYYIBPAY_SECRET_KEY,
@@ -171,11 +200,12 @@ try {
   ];
 
   $pdo->prepare("
-      INSERT INTO payments (booking_id, amount, currency, method, status, transaction_ref, gateway_payload, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      INSERT INTO payments (booking_id, booking_request_id, amount, currency, method, status, transaction_ref, gateway_payload, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")
     ->execute([
-      $bookingId,
+      $context['kind'] === 'request' ? null : $context['booking_id'],
+      $context['kind'] === 'request' ? $context['request_id'] : null,
       $amount,
       'MYR',
       'FPX',
@@ -187,6 +217,10 @@ try {
   $gatewayPayload['request']['payment_id'] = $paymentId;
   $pdo->prepare("UPDATE payments SET gateway_payload = ? WHERE id = ?")
       ->execute([json_encode($gatewayPayload, JSON_UNESCAPED_UNICODE), $paymentId]);
+
+  if ($context['kind'] === 'request') {
+    refresh_booking_request_progress($pdo, $context['request_id']);
+  }
 
   json_out([
     'success' => true,

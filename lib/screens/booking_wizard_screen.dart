@@ -34,8 +34,8 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
   final DateFormat _uiDateFormat = DateFormat('dd/MM/yyyy');
   int adults = 1;
   int children = 0;
+  int rooms = 1;
   bool _submitting = false;
-  bool _loadingProfile = false;
   Map<String, dynamic>? _profileCache;
   List<Map<String, dynamic>> _familyCache = const [];
 
@@ -43,7 +43,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
   void initState() {
     super.initState();
     _syncTravellers();
-    _prefillFromProfile();
   }
 
   void _syncTravellers() {
@@ -80,25 +79,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       ..addAll(childTravellers);
   }
 
-  Future<void> _prefillFromProfile() async {
-    final userId = await AuthService.instance.getUserId();
-    if (userId == null || userId <= 0) return;
-    try {
-      final user = await _loadProfileUser(userId);
-      final seed = _travellerFromProfile(user);
-      if (seed == null) return;
-      if (travellers.isEmpty) {
-        travellers.add(Traveller(isChild: false));
-      }
-      final merged = _mergeTraveller(travellers.first, seed);
-      setState(() {
-        travellers[0] = merged;
-      });
-    } catch (_) {
-      // Silent; autofill button will surface errors if needed.
-    }
-  }
-
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     final userId = await _ensureLoggedIn();
@@ -122,6 +102,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       'package_id': widget.packageId,
       'adults': adults,
       'children': children,
+      'rooms': rooms,
       'user_id': userId,
       'travellers': travellers.map((t) => t.toJson()).toList(),
     };
@@ -129,7 +110,9 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       await _svc.createBooking(payload);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Booking created!')),
+        const SnackBar(
+          content: Text('Booking request submitted! Our staff will confirm it soon.'),
+        ),
       );
       Navigator.pushReplacement(
         context,
@@ -172,28 +155,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
                   style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 18),
-                if (_loadingProfile)
-                  Row(
-                    children: const [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 10),
-                      Text('Fetching your saved details...'),
-                    ],
-                  )
-                else
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _autofillTravellers,
-                      icon: const Icon(Icons.auto_fix_high_outlined),
-                      label: const Text('Autofill from my account'),
-                    ),
-                  ),
-                const SizedBox(height: 18),
                 _countSelector(
                   label: 'Adults',
                   value: adults,
@@ -214,6 +175,17 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
                     setState(() {
                       children = next < 0 ? 0 : next;
                       _syncTravellers();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                _countSelector(
+                  label: 'Rooms',
+                  value: rooms,
+                  subtitle: 'Number of rooms needed',
+                  onChanged: (next) {
+                    setState(() {
+                      rooms = next < 1 ? 1 : next;
                     });
                   },
                 ),
@@ -312,6 +284,37 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
                     color: badgeTextColor,
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: traveller.useAccountDetails,
+                      onChanged: (value) => _toggleUseAccountDetails(index, value ?? false),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: GestureDetector(
+                        onTap: () => _toggleUseAccountDetails(index, !traveller.useAccountDetails),
+                        child: Text(
+                          'Use my account info',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _clearTraveller(index),
+                icon: const Icon(Icons.refresh_outlined, size: 18),
+                label: const Text('Clear'),
+                style: TextButton.styleFrom(foregroundColor: scheme.error),
               ),
             ],
           ),
@@ -423,6 +426,64 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
         ],
       ),
     );
+  }
+
+  Traveller _blankTravellerFor(Traveller traveller) {
+    return Traveller(isChild: traveller.isChild);
+  }
+
+  void _clearTraveller(int index) {
+    final current = travellers[index];
+    setState(() {
+      travellers[index] = _blankTravellerFor(current);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Traveller ${index + 1} cleared.')),
+    );
+  }
+
+  Future<void> _toggleUseAccountDetails(int index, bool enabled) async {
+    final current = travellers[index];
+    if (!enabled) {
+      setState(() {
+        travellers[index] = _blankTravellerFor(current);
+      });
+      return;
+    }
+
+    final userId = await _ensureLoggedIn();
+    if (userId == null) return;
+    try {
+      final user = await _loadProfileUser(userId);
+      final seed = _travellerFromProfile(user);
+      if (seed == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Update your profile with passport details to use this option.')),
+        );
+        return;
+      }
+      final merged = _mergeTraveller(current, seed).copyWith(useAccountDetails: true);
+      setState(() {
+        for (var i = 0; i < travellers.length; i++) {
+          final slotTraveller = travellers[i];
+          if (i == index) {
+            travellers[i] = merged;
+          } else if (slotTraveller.useAccountDetails) {
+            travellers[i] = _blankTravellerFor(slotTraveller);
+          }
+        }
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Traveller ${index + 1} updated from your account.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to use account info: ${friendlyError(e)}')),
+      );
+    }
   }
 
   DateTime _suggestedDob(Traveller traveller) {
@@ -558,7 +619,8 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
     if (selected == null) return;
 
     final current = travellers[index];
-    final replacement = _travellerFromFamily(selected, isChildSlot: current.isChild);
+    final replacement = _travellerFromFamily(selected, isChildSlot: current.isChild)
+        .copyWith(useAccountDetails: false);
     setState(() {
       travellers[index] = replacement; // new object to refresh initialValue fields
     });
@@ -585,6 +647,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       passportExpiryDate: seed.passportExpiryDate,
       isChild: isChildSlot,
       familyMemberId: seed.familyMemberId,
+      useAccountDetails: false,
     );
   }
 
@@ -599,6 +662,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       passportExpiryDate: current.passportExpiryDate ?? seed.passportExpiryDate,
       isChild: current.isChild,
       familyMemberId: current.familyMemberId ?? seed.familyMemberId,
+      useAccountDetails: current.useAccountDetails || seed.useAccountDetails,
     );
   }
 
@@ -625,6 +689,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       passportIssueDate: issue,
       passportExpiryDate: expiry,
       isChild: _isChild(dob),
+      useAccountDetails: true,
     );
   }
 
@@ -652,79 +717,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       isChild: isChild,
       familyMemberId: readIntOrNull(f['id']),
     );
-  }
-
-  Future<void> _autofillTravellers() async {
-    final userId = await _ensureLoggedIn();
-    if (userId == null) return;
-    if (_loadingProfile) return;
-
-    setState(() => _loadingProfile = true);
-    try {
-      final user = await _loadProfileUser(userId);
-      final family = await _loadFamilyList(userId);
-
-      _syncTravellers();
-
-      final adultSeeds = <Traveller>[];
-      final childSeeds = <Traveller>[];
-      var applied = false;
-
-      final profileSeed = _travellerFromProfile(user);
-      if (profileSeed != null) {
-        (profileSeed.isChild ? childSeeds : adultSeeds).add(profileSeed);
-      }
-
-      for (final f in family) {
-        final seed = _travellerFromFamilyRecord(f);
-        if (seed == null) continue;
-        if (seed.isChild) {
-          childSeeds.add(seed);
-        } else {
-          adultSeeds.add(seed);
-        }
-      }
-
-      final updated = <Traveller>[];
-      for (final current in travellers) {
-        Traveller? seed;
-        if (current.isChild && childSeeds.isNotEmpty) {
-          seed = childSeeds.removeAt(0);
-        } else if (!current.isChild && adultSeeds.isNotEmpty) {
-          seed = adultSeeds.removeAt(0);
-        }
-        if (seed != null) {
-          applied = true;
-        }
-        updated.add(_mergeTraveller(current, seed));
-      }
-
-      setState(() {
-        for (var i = 0; i < travellers.length && i < updated.length; i++) {
-          travellers[i] = updated[i];
-        }
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            applied
-                ? 'Traveller details autofilled from your account.'
-                : 'No saved traveller data available to autofill.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to autofill travellers: ${friendlyError(e)}')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _loadingProfile = false);
-      }
-    }
   }
 
   Future<Map<String, dynamic>> _loadProfileUser(int userId) async {

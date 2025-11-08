@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config_service.dart';
 import '../utils/json_utils.dart';
 import 'api_client.dart';
+import 'biometric_service.dart';
 
 class AuthService {
   AuthService._();
@@ -84,7 +85,6 @@ class AuthService {
       'email': sp.getString(_keyEmail),
       'phone': sp.getString(_keyPhone),
       'photo': sp.getString(_keyPhoto),
-      'phone': sp.getString(_keyPhone),
     };
   }
 
@@ -129,6 +129,7 @@ class AuthService {
       } else {
         await sp.remove(_keyPhoto);
       }
+      await _refreshBiometricSnapshot(sp);
       return;
     }
     throw Exception(m['error'] ?? 'Registration failed');
@@ -168,6 +169,7 @@ class AuthService {
       } else {
         await sp.remove(_keyPhoto);
       }
+      await _refreshBiometricSnapshot(sp);
       return;
     }
     throw Exception(m['error'] ?? 'Login failed');
@@ -216,5 +218,69 @@ class AuthService {
         await sp.remove(_keyPhoto);
       }
     }
+    await _refreshBiometricSnapshot(sp);
+  }
+
+  Future<void> restoreSessionFromSnapshot(BiometricSnapshot snapshot) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt(_keyUserId, snapshot.userId);
+
+    final resolvedName = _resolveDisplayName({
+      'name': snapshot.name,
+      'username': snapshot.username,
+      'email': snapshot.email,
+    }, fallback: snapshot.username ?? snapshot.email ?? '');
+
+    if (resolvedName.isNotEmpty) {
+      await sp.setString(_keyName, resolvedName);
+    } else {
+      await sp.remove(_keyName);
+    }
+
+    if (snapshot.username != null && snapshot.username!.isNotEmpty) {
+      await sp.setString(_keyUsername, snapshot.username!);
+    } else {
+      await sp.remove(_keyUsername);
+    }
+
+    if (snapshot.email != null && snapshot.email!.isNotEmpty) {
+      await sp.setString(_keyEmail, snapshot.email!);
+    } else {
+      await sp.remove(_keyEmail);
+    }
+
+    if (snapshot.phone != null && snapshot.phone!.isNotEmpty) {
+      await sp.setString(_keyPhone, snapshot.phone!);
+    } else {
+      await sp.remove(_keyPhone);
+    }
+
+    if (snapshot.photo != null && snapshot.photo!.isNotEmpty) {
+      await sp.setString(_keyPhoto, snapshot.photo!);
+    } else {
+      await sp.remove(_keyPhoto);
+    }
+  }
+
+  Future<void> _refreshBiometricSnapshot(SharedPreferences sp) async {
+    final existing = await BiometricAuthService.instance.readSnapshot();
+    final userId = sp.getInt(_keyUserId);
+    if (existing == null || userId == null || userId <= 0) {
+      return;
+    }
+    if (existing.userId != userId) {
+      return;
+    }
+    await BiometricAuthService.instance.saveSnapshot(
+      BiometricSnapshot(
+        userId: userId,
+        name: sp.getString(_keyName),
+        username: sp.getString(_keyUsername),
+        email: sp.getString(_keyEmail),
+        phone: sp.getString(_keyPhone),
+        photo: sp.getString(_keyPhoto),
+        savedAt: DateTime.now(),
+      ),
+    );
   }
 }

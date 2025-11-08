@@ -23,6 +23,7 @@ class _TripsScreenState extends State<TripsScreen> {
   final _svc = BookingService();
   final _dash = DashboardService();
   late Future<_TripsResult> _future;
+  List<Booking> _cachedBookings = const [];
 
   @override
   void initState() {
@@ -33,9 +34,11 @@ class _TripsScreenState extends State<TripsScreen> {
   Future<_TripsResult> _load() async {
     final loggedIn = await AuthService.instance.isLoggedIn();
     if (!loggedIn) {
+      setState(() => _cachedBookings = const []);
       return const _TripsResult(loggedIn: false, bookings: []);
     }
     final bookings = await _svc.myBookings();
+    _cachedBookings = bookings;
     return _TripsResult(loggedIn: true, bookings: bookings);
   }
 
@@ -134,8 +137,17 @@ class _TripsScreenState extends State<TripsScreen> {
       length: 2,
       child: Scaffold(
         backgroundColor: scheme.background,
-        appBar: AppBar(title: const Text('My Trips'), bottom: const TabBar(tabs: [Tab(text: 'Upcoming'), Tab(text: 'Past')]),
-            actions: [IconButton(onPressed: (){}, icon: const Icon(Icons.search))]),
+        appBar: AppBar(
+          title: const Text('My Trips'),
+          bottom: const TabBar(tabs: [Tab(text: 'Upcoming'), Tab(text: 'Past')]),
+          actions: [
+            IconButton(
+              tooltip: 'Search trips',
+              onPressed: _openSearch,
+              icon: const Icon(Icons.search),
+            ),
+          ],
+        ),
         body: FutureBuilder(
           future: _future,
           builder: (ctx, snap) {
@@ -163,13 +175,36 @@ class _TripsScreenState extends State<TripsScreen> {
               });
             }
             final all = result.bookings;
-            final upcoming = all.where((b)=>b.status=='CONFIRMED').toList();
-            final past = all.where((b)=>b.status!='CONFIRMED').toList();
+            final upcoming = all.where((b) => _isUpcomingStatus(b.status)).toList();
+            final past = all.where((b) => !_isUpcomingStatus(b.status)).toList();
             return TabBarView(children: [_list(upcoming), _list(past)]);
           },
         ),
       ),
     );
+  }
+
+  Future<void> _openSearch() async {
+    final loggedIn = await AuthService.instance.isLoggedIn();
+    if (!loggedIn) {
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      if (ok == true) {
+        _reload();
+      }
+      return;
+    }
+    if (_cachedBookings.isEmpty) {
+      _cachedBookings = await _svc.myBookings();
+    }
+    final result = await showSearch<Booking?>(
+      context: context,
+      delegate: _TripSearchDelegate(_cachedBookings),
+    );
+    if (result != null) {
+      _openDetails(result);
+    }
   }
 
   Widget _list(List<Booking> items) {
@@ -185,7 +220,23 @@ class _TripsScreenState extends State<TripsScreen> {
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(b.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      b.title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _statusPill(b.status),
+                ],
+              ),
               const SizedBox(height: 6),
               Text(
                 'Departure: —',
@@ -224,6 +275,7 @@ class _TripsScreenState extends State<TripsScreen> {
       },
     );
   }
+
 }
 
 String _stepLabel(Map<String, dynamic> step) {
@@ -269,6 +321,39 @@ bool _stepDone(Map<String, dynamic> step) {
         value == 'true';
   }
   return false;
+}
+
+bool _isUpcomingStatus(String status) {
+  final upper = status.toUpperCase();
+  const archived = {'CANCELLED', 'REJECTED', 'COMPLETED'};
+  return !archived.contains(upper);
+}
+
+Widget _statusPill(String status) {
+  final upper = status.toUpperCase();
+  Color bg;
+  switch (upper) {
+    case 'CONFIRMED':
+      bg = Colors.green.shade600;
+      break;
+    case 'READY_FOR_REVIEW':
+      bg = Colors.blue.shade600;
+      break;
+    case 'CANCELLED':
+    case 'REJECTED':
+      bg = Colors.red.shade700;
+      break;
+    default:
+      bg = Colors.orange.shade700;
+  }
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+    child: Text(
+      upper.replaceAll('_', ' '),
+      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+    ),
+  );
 }
 
 DateTime? _stepDate(Map<String, dynamic> step, List<String> keys) {
@@ -902,4 +987,60 @@ class _TripsLoginPrompt extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TripSearchDelegate extends SearchDelegate<Booking?> {
+  _TripSearchDelegate(this.bookings);
+  final List<Booking> bookings;
+
+  List<Booking> _results(String query) {
+    if (query.trim().isEmpty) return bookings;
+    final lower = query.toLowerCase();
+    return bookings.where((b) {
+      return b.title.toLowerCase().contains(lower) ||
+          (b.status.toLowerCase().contains(lower));
+    }).toList();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildList(context);
+
+  @override
+  Widget buildResults(BuildContext context) => _buildList(context);
+
+  Widget _buildList(BuildContext context) {
+    final filtered = _results(query);
+    if (filtered.isEmpty) {
+      return const Center(child: Text('No trips match your search.'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      itemCount: filtered.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, i) {
+        final b = filtered[i];
+        return ListTile(
+          title: Text(b.title),
+          subtitle: Text('Status: ${b.status}'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => close(context, b),
+        );
+      },
+    );
+  }
+
+  @override
+  List<Widget>? buildActions(BuildContext context) => [
+        if (query.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () => query = '',
+          ),
+      ];
+
+  @override
+  Widget? buildLeading(BuildContext context) => IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => close(context, null),
+      );
 }

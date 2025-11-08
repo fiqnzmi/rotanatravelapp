@@ -9,6 +9,7 @@ if ($userId <= 0) {
 }
 
 $pdo = db();
+ensure_booking_request_tables($pdo);
 $stmt = $pdo->prepare("SELECT id, username, name, email, phone, created_at FROM users WHERE id=? LIMIT 1");
 $stmt->execute([$userId]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,6 +34,22 @@ if (!empty($bookingIds)) {
   $travellers = $travStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+$requestStmt = $pdo->prepare("SELECT * FROM booking_requests WHERE user_id=? ORDER BY created_at DESC");
+$requestStmt->execute([$userId]);
+$bookingRequests = $requestStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$requestIds = array_map(static function ($row) {
+  return (int)$row['id'];
+}, $bookingRequests);
+
+$requestTravellers = [];
+if (!empty($requestIds)) {
+  $rqPlaceholders = implode(',', array_fill(0, count($requestIds), '?'));
+  $rqTravStmt = $pdo->prepare("SELECT * FROM booking_request_travellers WHERE booking_request_id IN ($rqPlaceholders) ORDER BY id ASC");
+  $rqTravStmt->execute($requestIds);
+  $requestTravellers = $rqTravStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 $familyStmt = $pdo->prepare("SELECT id, full_name, relationship, gender, passport_no, dob, nationality, phone, created_at FROM family_members WHERE user_id=? ORDER BY id ASC");
 $familyStmt->execute([$userId]);
 $family = $familyStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -49,12 +66,21 @@ if (!empty($bookingIds)) {
   $payments = $payStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+if (!empty($requestIds)) {
+  $rqPlaceholders = implode(',', array_fill(0, count($requestIds), '?'));
+  $rqPayStmt = $pdo->prepare("SELECT * FROM payments WHERE booking_request_id IN ($rqPlaceholders) ORDER BY created_at DESC");
+  $rqPayStmt->execute($requestIds);
+  $payments = array_merge($payments, $rqPayStmt->fetchAll(PDO::FETCH_ASSOC));
+}
+
 ok([
   'generated_at' => date('c'),
   'user' => $user,
   'privacy_settings' => fetch_privacy_settings($pdo, $userId),
   'bookings' => $bookings,
+  'booking_requests' => $bookingRequests,
   'booking_travellers' => $travellers,
+  'booking_request_travellers' => $requestTravellers,
   'family_members' => $family,
   'documents' => $documents,
   'payments' => $payments,

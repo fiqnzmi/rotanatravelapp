@@ -13,6 +13,7 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/helpers.php';
 
 function json_out(array $payload, int $code = 200): void {
   http_response_code($code);

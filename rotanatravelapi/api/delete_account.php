@@ -12,6 +12,7 @@ if ($userId <= 0) {
 $password = (string)$input['password'];
 
 $pdo = db();
+ensure_booking_request_tables($pdo);
 $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE id=? LIMIT 1");
 $stmt->execute([$userId]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -41,6 +42,21 @@ try {
         ->execute(array_values($bookingIds));
     $pdo->prepare("DELETE FROM bookings WHERE id IN ($placeholders)")
         ->execute(array_values($bookingIds));
+  }
+
+  $requestStmt = $pdo->prepare("SELECT id FROM booking_requests WHERE user_id=?");
+  $requestStmt->execute([$userId]);
+  $requestIds = $requestStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+  if (!empty($requestIds)) {
+    $rqPlaceholders = implode(',', array_fill(0, count($requestIds), '?'));
+    $pdo->prepare("DELETE FROM booking_request_travellers WHERE booking_request_id IN ($rqPlaceholders)")
+        ->execute($requestIds);
+    $pdo->prepare("DELETE FROM payments WHERE booking_request_id IN ($rqPlaceholders)")
+        ->execute($requestIds);
+    $pdo->prepare("DELETE FROM documents WHERE booking_request_id IN ($rqPlaceholders)")
+        ->execute($requestIds);
+    $pdo->prepare("DELETE FROM booking_requests WHERE id IN ($rqPlaceholders)")
+        ->execute($requestIds);
   }
 
   $pdo->prepare("DELETE FROM documents WHERE user_id=?")->execute([$userId]);

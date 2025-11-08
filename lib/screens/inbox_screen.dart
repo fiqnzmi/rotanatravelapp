@@ -16,6 +16,8 @@ class InboxScreen extends StatefulWidget {
 class _InboxScreenState extends State<InboxScreen> {
   final _svc = DashboardService();
   late Future<_InboxResult> _future;
+  List<Map<String, dynamic>> _allNotifications = const [];
+  String _activeFilter = 'ALL';
 
   @override
   void initState() {
@@ -26,6 +28,10 @@ class _InboxScreenState extends State<InboxScreen> {
   Future<_InboxResult> _load() async {
     final loggedIn = await AuthService.instance.isLoggedIn();
     if (!loggedIn) {
+      setState(() {
+        _allNotifications = const [];
+        _activeFilter = 'ALL';
+      });
       return const _InboxResult(loggedIn: false, notifications: []);
     }
     final id = await AuthService.instance.getUserId();
@@ -33,6 +39,7 @@ class _InboxScreenState extends State<InboxScreen> {
       return const _InboxResult(loggedIn: false, notifications: []);
     }
     final data = await _svc.listNotifications(id);
+    _allNotifications = data;
     return _InboxResult(loggedIn: true, notifications: data);
   }
 
@@ -43,13 +50,55 @@ class _InboxScreenState extends State<InboxScreen> {
     });
   }
 
+  List<Map<String, dynamic>> _filteredNotifications() {
+    if (_activeFilter == 'ALL') return _allNotifications;
+    return _allNotifications.where((m) {
+      final type = (m['type'] ?? '').toString().toUpperCase();
+      return type == _activeFilter;
+    }).toList();
+  }
+
+  Future<void> _openFilter() async {
+    final types = ['ALL', 'PAYMENT', 'DOCS', 'BOOKING', 'PROMO', 'GENERAL'];
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: types
+              .map(
+                (t) => ListTile(
+                  leading: t == _activeFilter ? const Icon(Icons.check) : null,
+                  title: Text(t == 'ALL' ? 'Show all' : t),
+                  onTap: () => Navigator.of(ctx).pop(t),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _activeFilter = selected;
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Scaffold(
       backgroundColor: scheme.background,
-      appBar: AppBar(title: const Text('Inbox'), actions: [IconButton(onPressed: (){}, icon: const Icon(Icons.more_vert))]),
+      appBar: AppBar(
+        title: const Text('Inbox'),
+        actions: [
+          IconButton(
+            tooltip: 'Filter notifications',
+            onPressed: _openFilter,
+            icon: const Icon(Icons.more_vert),
+          ),
+        ],
+      ),
       body: FutureBuilder(
         future: _future,
         builder: (_, snap) {
@@ -76,7 +125,7 @@ class _InboxScreenState extends State<InboxScreen> {
               }
             });
           }
-          final items = result.notifications;
+          final items = _filteredNotifications();
           if (items.isEmpty) return const Center(child: Text('No messages'));
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),

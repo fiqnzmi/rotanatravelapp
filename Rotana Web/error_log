@@ -1,0 +1,15 @@
+[24-Oct-2025 10:06:00 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[28000] [1045] Access denied for user 'root'@'localhost' (using password: NO) in /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php:8
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php(8): PDO->__construct()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php on line 8
+[24-Oct-2025 10:15:53 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[28000] [1045] Access denied for user 'root'@'localhost' (using password: NO) in /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php:8
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php(8): PDO->__construct()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/index.php on line 8
+[03-Nov-2025 11:56:50 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row: a foreign key constraint fails (`sabrisae_rotanatravel`.`bookings`, CONSTRAINT `fk_bookings_package` FOREIGN KEY (`package_id`) REFERENCES `packages` (`id`) ON UPDATE CASCADE) in /home/sabrisae/public_html/ruangprojek/rotanatravel/admin_package.php:440
+Stack trace:
+#0 /home/sabrisae/public_html/ruangprojek/rotanatravel/admin_package.php(440): PDOStatement->execute()
+#1 {main}
+  thrown in /home/sabrisae/public_html/ruangprojek/rotanatravel/admin_package.php on line 440

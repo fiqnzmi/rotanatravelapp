@@ -7,7 +7,7 @@ $rows = $pdo->query("
   SELECT id, title, description, price,
          duration_days, cities, hotel_stars,
          rating_avg, rating_count,
-         images_json
+         images_json, departures_json
   FROM packages
   ORDER BY created_at DESC, id DESC
 ")->fetchAll();
@@ -33,9 +33,17 @@ foreach ($rows as &$r) {
   if ($r['rating_count'] !== null) {
     $r['rating_count'] = (int)$r['rating_count'];
   }
+  $departures = [];
+  if (!empty($r['departures_json'])) {
+    $decodedDepartures = json_decode($r['departures_json'], true);
+    if (is_array($decodedDepartures)) {
+      $departures = $decodedDepartures;
+    }
+  }
   $r['images'] = $images;
+  $r['departures'] = $departures;
   $r['cover_image'] = $images[0] ?? null;
-  unset($r['images_json']);
+  unset($r['images_json'], $r['departures_json']);
 }
 unset($r);
 

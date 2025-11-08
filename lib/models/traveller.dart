@@ -9,6 +9,7 @@ class Traveller {
   DateTime? passportExpiryDate;
   bool isChild;
   int? familyMemberId;
+  bool useAccountDetails;
 
   Traveller({
     this.fullName = '',
@@ -19,6 +20,7 @@ class Traveller {
     this.passportExpiryDate,
     this.isChild = false,
     this.familyMemberId,
+    this.useAccountDetails = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +34,30 @@ class Traveller {
         'family_member_id': familyMemberId,
         'familyMemberId': familyMemberId,
       };
+
+  Traveller copyWith({
+    String? fullName,
+    String? gender,
+    DateTime? dateOfBirth,
+    String? passportNo,
+    DateTime? passportIssueDate,
+    DateTime? passportExpiryDate,
+    bool? isChild,
+    int? familyMemberId,
+    bool? useAccountDetails,
+  }) {
+    return Traveller(
+      fullName: fullName ?? this.fullName,
+      gender: gender ?? this.gender,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      passportNo: passportNo ?? this.passportNo,
+      passportIssueDate: passportIssueDate ?? this.passportIssueDate,
+      passportExpiryDate: passportExpiryDate ?? this.passportExpiryDate,
+      isChild: isChild ?? this.isChild,
+      familyMemberId: familyMemberId ?? this.familyMemberId,
+      useAccountDetails: useAccountDetails ?? this.useAccountDetails,
+    );
+  }
 
   static String? _format(DateTime? dt) =>
       dt == null ? null : DateFormat('yyyy-MM-dd').format(dt);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/biometric_service.dart';
 import '../utils/error_utils.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -19,6 +20,27 @@ class _LoginScreenState extends State<LoginScreen> {
   final passC = TextEditingController();
   bool obscure = true;
   bool loading = false;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricAvailability();
+  }
+
+  Future<void> _loadBiometricAvailability() async {
+    final biometrics = BiometricAuthService.instance;
+    final hasSnapshot = await biometrics.hasSnapshot();
+    if (!hasSnapshot) {
+      if (mounted) {
+        setState(() => _biometricAvailable = false);
+      }
+      return;
+    }
+    final canUse = await biometrics.canUseBiometrics();
+    if (!mounted) return;
+    setState(() => _biometricAvailable = canUse);
+  }
 
   Future<void> _submit() async {
     setState(() => loading = true);
@@ -33,6 +55,44 @@ class _LoginScreenState extends State<LoginScreen> {
       // Sekiranya skrin ini masih aktif selepas callback, pop dengan 'true'
       // supaya pemanggil tahu login berjaya.
       if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    setState(() => loading = true);
+    try {
+      final biometrics = BiometricAuthService.instance;
+      final authenticated = await biometrics.authenticate('Authenticate to log in');
+      if (!authenticated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Biometric authentication cancelled.')),
+          );
+        }
+        return;
+      }
+      final snapshot = await biometrics.readSnapshot();
+      if (snapshot == null) {
+        if (mounted) {
+          setState(() => _biometricAvailable = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No biometric credentials found.')),
+          );
+        }
+        return;
+      }
+      await AuthService.instance.restoreSessionFromSnapshot(snapshot);
+      if (!mounted) return;
+      widget.onAuthSuccess?.call();
+      if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -128,6 +188,20 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Text(loading ? 'Please wait...' : 'Log In'),
             ),
           ),
+          if (_biometricAvailable) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: loading ? null : _loginWithBiometrics,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('Log in with biometrics'),
+                style: OutlinedButton.styleFrom(
+                  shape: const StadiumBorder(),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

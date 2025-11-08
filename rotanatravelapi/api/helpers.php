@@ -141,6 +141,329 @@ function save_privacy_settings(PDO $pdo, int $userId, array $settings): void {
   ]);
 }
 
+function ensure_booking_request_tables(PDO $pdo): void {
+  static $ensured = false;
+  if ($ensured) {
+    return;
+  }
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS booking_requests (
+      id INT NOT NULL AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      package_id INT NOT NULL,
+      adults INT NOT NULL DEFAULT 1,
+      children INT NOT NULL DEFAULT 0,
+      rooms INT NOT NULL DEFAULT 1,
+      status ENUM('NOT_CONFIRMED','AWAITING_REQUIREMENTS','READY_FOR_REVIEW','APPROVED','REJECTED') NOT NULL DEFAULT 'NOT_CONFIRMED',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      departure_date DATE DEFAULT NULL,
+      total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      documents_ready TINYINT(1) NOT NULL DEFAULT 0,
+      payment_ready TINYINT(1) NOT NULL DEFAULT 0,
+      notes TEXT NULL,
+      approved_booking_id INT DEFAULT NULL,
+      approved_at DATETIME DEFAULT NULL,
+      approved_by INT DEFAULT NULL,
+      PRIMARY KEY (id),
+      KEY idx_booking_requests_user (user_id),
+      KEY idx_booking_requests_status (status),
+      KEY idx_booking_requests_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  ");
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS booking_request_travellers (
+      id INT NOT NULL AUTO_INCREMENT,
+      booking_request_id INT NOT NULL,
+      full_name VARCHAR(200) NOT NULL,
+      passport_no VARCHAR(100) DEFAULT NULL,
+      dob DATE DEFAULT NULL,
+      gender VARCHAR(20) DEFAULT NULL,
+      passport_issue_date DATE DEFAULT NULL,
+      passport_expiry_date DATE DEFAULT NULL,
+      PRIMARY KEY (id),
+      KEY idx_request_travellers_booking (booking_request_id),
+      CONSTRAINT fk_request_travellers_request FOREIGN KEY (booking_request_id)
+        REFERENCES booking_requests (id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  ");
+
+  if (!db_column_exists($pdo, 'documents', 'booking_request_id')) {
+    $pdo->exec("ALTER TABLE documents ADD COLUMN booking_request_id INT DEFAULT NULL AFTER booking_id");
+    $pdo->exec("ALTER TABLE documents ADD KEY idx_documents_booking_request (booking_request_id)");
+    try {
+      $pdo->exec("ALTER TABLE documents ADD CONSTRAINT fk_documents_booking_request FOREIGN KEY (booking_request_id) REFERENCES booking_requests (id) ON DELETE CASCADE ON UPDATE CASCADE");
+    } catch (Throwable $e) {
+      // Constraint might already exist or fail in shared hosting; ignore.
+    }
+  }
+
+  if (!db_column_exists($pdo, 'payments', 'booking_request_id')) {
+    try {
+      $pdo->exec("ALTER TABLE payments MODIFY booking_id INT DEFAULT NULL");
+    } catch (Throwable $e) {
+      // ignore if already nullable
+    }
+    $pdo->exec("ALTER TABLE payments ADD COLUMN booking_request_id INT DEFAULT NULL AFTER booking_id");
+    $pdo->exec("ALTER TABLE payments ADD KEY idx_payments_booking_request (booking_request_id)");
+    try {
+      $pdo->exec("ALTER TABLE payments ADD CONSTRAINT fk_payments_booking_request FOREIGN KEY (booking_request_id) REFERENCES booking_requests (id) ON DELETE CASCADE ON UPDATE CASCADE");
+    } catch (Throwable $e) {
+      // ignore
+    }
+  }
+
+  if (!db_column_exists($pdo, 'booking_requests', 'rooms')) {
+    $pdo->exec("ALTER TABLE booking_requests ADD COLUMN rooms INT NOT NULL DEFAULT 1 AFTER children");
+  }
+  if (!db_column_exists($pdo, 'bookings', 'rooms')) {
+    $pdo->exec("ALTER TABLE bookings ADD COLUMN rooms INT NOT NULL DEFAULT 1 AFTER children");
+  }
+
+  $ensured = true;
+}
+
+function booking_required_document_types(): array {
+  return ['PASSPORT','INSURANCE','VISA','PAYMENT_PROOF'];
+}
+
+function ensure_package_reviews_table(PDO $pdo): void {
+  static $done = false;
+  if ($done) {
+    return;
+  }
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS package_reviews (
+      id INT NOT NULL AUTO_INCREMENT,
+      package_id INT NOT NULL,
+      user_id INT NOT NULL,
+      rating TINYINT NOT NULL,
+      comment TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uniq_package_user (package_id, user_id),
+      KEY idx_package_reviews_package (package_id),
+      KEY idx_package_reviews_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  ");
+  $done = true;
+}
+
+function format_package_review_row(array $row, int $currentUserId = 0): array {
+  $name = trim((string)($row['user_name'] ?? $row['user_username'] ?? ''));
+  if ($name === '') {
+    $name = 'Traveler';
+  }
+  $initials = reviewer_initials($name);
+  $photo = $row['profile_photo_url'] ?? $row['profile_photo'] ?? null;
+  return [
+    'id' => (int)($row['id'] ?? 0),
+    'package_id' => (int)($row['package_id'] ?? 0),
+    'user_id' => (int)($row['user_id'] ?? 0),
+    'rating' => (int)($row['rating'] ?? 0),
+    'comment' => $row['comment'] ?? null,
+    'created_at' => $row['created_at'] ?? null,
+    'updated_at' => $row['updated_at'] ?? null,
+    'reviewer_name' => $name,
+    'reviewer_initials' => $initials,
+    'reviewer_photo' => $photo,
+    'is_mine' => $currentUserId > 0 && (int)($row['user_id'] ?? 0) === $currentUserId,
+  ];
+}
+
+function reviewer_initials(string $name): string {
+  $substr = function (string $text, int $start, int $length = 1): string {
+    if (function_exists('mb_substr')) {
+      return mb_substr($text, $start, $length);
+    }
+    return substr($text, $start, $length);
+  };
+  $strlen = function (string $text): int {
+    if (function_exists('mb_strlen')) {
+      return mb_strlen($text);
+    }
+    return strlen($text);
+  };
+  $trimmed = trim($name);
+  if ($trimmed === '') {
+    return 'T';
+  }
+  $parts = preg_split('/\s+/', $trimmed) ?: [];
+  $first = $substr($parts[0], 0, 1);
+  $second = '';
+  if (count($parts) > 1) {
+    $second = $substr($parts[count($parts) - 1], 0, 1);
+  } elseif ($strlen($trimmed) > 1) {
+    $second = $substr($trimmed, 1, 1);
+  }
+  $initials = $first . $second;
+  return function_exists('mb_strtoupper') ? mb_strtoupper($initials) : strtoupper($initials);
+}
+
+function package_rating_summary(PDO $pdo, int $packageId): array {
+  ensure_package_reviews_table($pdo);
+  $stmt = $pdo->prepare("SELECT COUNT(*) AS total, AVG(rating) AS avg_rating FROM package_reviews WHERE package_id = ?");
+  $stmt->execute([$packageId]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'avg_rating' => null];
+  $count = (int)($row['total'] ?? 0);
+  $avg = $row['avg_rating'] !== null ? round((float)$row['avg_rating'], 2) : null;
+  return [
+    'rating_count' => $count,
+    'rating_avg' => $avg,
+  ];
+}
+
+function recalc_package_rating(PDO $pdo, int $packageId): array {
+  ensure_package_reviews_table($pdo);
+  $summary = package_rating_summary($pdo, $packageId);
+  $stmt = $pdo->prepare("UPDATE packages SET rating_avg = ?, rating_count = ? WHERE id = ?");
+  $stmt->execute([$summary['rating_avg'], $summary['rating_count'], $packageId]);
+  return $summary;
+}
+
+function user_can_review_package(PDO $pdo, int $userId, int $packageId): bool {
+  $stmt = $pdo->prepare("SELECT 1 FROM bookings WHERE user_id = ? AND package_id = ? LIMIT 1");
+  $stmt->execute([$userId, $packageId]);
+  if ($stmt->fetchColumn()) {
+    return true;
+  }
+  $stmt = $pdo->prepare("
+    SELECT 1
+    FROM booking_requests
+    WHERE user_id = ? AND package_id = ? AND status IN ('READY_FOR_REVIEW','APPROVED')
+    LIMIT 1
+  ");
+  $stmt->execute([$userId, $packageId]);
+  return (bool)$stmt->fetchColumn();
+}
+
+function booking_request_display_id(int $requestId): int {
+  return -abs($requestId);
+}
+
+function booking_request_id_from_display(int $bookingId): int {
+  return abs($bookingId);
+}
+
+function is_booking_request_identifier(int $bookingId): bool {
+  return $bookingId < 0;
+}
+
+function fetch_booking_context(PDO $pdo, int $identifier, ?int $userId = null): array {
+  ensure_booking_request_tables($pdo);
+  if (is_booking_request_identifier($identifier)) {
+    $requestId = booking_request_id_from_display($identifier);
+    $sql = "SELECT * FROM booking_requests WHERE id=?";
+    $params = [$requestId];
+    if ($userId !== null && $userId > 0) {
+      $sql .= " AND user_id=?";
+      $params[] = $userId;
+    }
+    $stmt = $pdo->prepare($sql . " LIMIT 1");
+    $stmt->execute($params);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    return [
+      'found' => $row !== null,
+      'kind' => 'request',
+      'display_id' => $identifier,
+      'request_id' => $requestId,
+      'booking_id' => null,
+      'row' => $row,
+    ];
+  }
+
+  $sql = "SELECT * FROM bookings WHERE id=?";
+  $params = [$identifier];
+  if ($userId !== null && $userId > 0) {
+    $sql .= " AND user_id=?";
+    $params[] = $userId;
+  }
+  $stmt = $pdo->prepare($sql . " LIMIT 1");
+  $stmt->execute($params);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+  return [
+    'found' => $row !== null,
+    'kind' => 'booking',
+    'display_id' => $identifier,
+    'request_id' => null,
+    'booking_id' => $row ? $identifier : null,
+    'row' => $row,
+  ];
+}
+
+function refresh_booking_request_progress(PDO $pdo, int $requestId): array {
+  ensure_booking_request_tables($pdo);
+  $stmt = $pdo->prepare("SELECT id, status, total_amount FROM booking_requests WHERE id=? LIMIT 1");
+  $stmt->execute([$requestId]);
+  $request = $stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$request) {
+    return ['exists' => false];
+  }
+
+  $requiredDocs = booking_required_document_types();
+  $docPlaceholders = implode(',', array_fill(0, count($requiredDocs), '?'));
+  $docStmt = $pdo->prepare("
+    SELECT doc_type,
+           MAX(CASE WHEN file_path IS NOT NULL AND file_path <> '' THEN 1 ELSE 0 END) AS has_file
+    FROM documents
+    WHERE booking_request_id = ? AND doc_type IN ($docPlaceholders)
+    GROUP BY doc_type
+  ");
+  $docStmt->execute(array_merge([$requestId], $requiredDocs));
+  $docStatus = array_fill_keys($requiredDocs, 0);
+  while ($row = $docStmt->fetch(PDO::FETCH_ASSOC)) {
+    $docType = strtoupper((string)($row['doc_type'] ?? ''));
+    if ($docType !== '' && array_key_exists($docType, $docStatus)) {
+      $docStatus[$docType] = (int)$row['has_file'] === 1 ? 1 : 0;
+    }
+  }
+  $docsReady = !in_array(0, $docStatus, true) && count($docStatus) === count($requiredDocs);
+
+  $payStmt = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE booking_request_id = ? AND status = 'PAID'");
+  $payStmt->execute([$requestId]);
+  $paidAmount = (float)$payStmt->fetchColumn();
+  $totalAmount = isset($request['total_amount']) ? (float)$request['total_amount'] : 0.0;
+  $paymentReady = $totalAmount <= 0 ? true : ($paidAmount + 0.01) >= $totalAmount;
+
+  $currentStatus = $request['status'] ?? 'NOT_CONFIRMED';
+  $newStatus = $currentStatus;
+  if (!in_array($currentStatus, ['APPROVED','REJECTED'], true)) {
+    if ($docsReady && $paymentReady) {
+      $newStatus = 'READY_FOR_REVIEW';
+    } elseif ($docsReady || $paymentReady) {
+      $newStatus = 'AWAITING_REQUIREMENTS';
+    } else {
+      $newStatus = 'NOT_CONFIRMED';
+    }
+  }
+
+  $updateStmt = $pdo->prepare("
+    UPDATE booking_requests
+    SET documents_ready = ?,
+        payment_ready = ?,
+        status = ?
+    WHERE id = ?
+  ");
+  $updateStmt->execute([
+    $docsReady ? 1 : 0,
+    $paymentReady ? 1 : 0,
+    $newStatus,
+    $requestId,
+  ]);
+
+  return [
+    'exists' => true,
+    'documents_ready' => $docsReady,
+    'payment_ready' => $paymentReady,
+    'status' => $newStatus,
+    'total_amount' => $totalAmount,
+    'paid_amount' => $paidAmount,
+  ];
+}
+
 function normalize_key_identifier(string $key): string {
   return preg_replace('/[^a-z0-9]/', '', strtolower($key));
 }

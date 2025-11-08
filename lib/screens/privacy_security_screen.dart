@@ -14,11 +14,6 @@ class PrivacySecurityScreen extends StatefulWidget {
 
 class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   final PrivacyService _service = PrivacyService();
-
-  bool _twoFactor = false;
-  bool _biometricLogin = false;
-  bool _rememberDevices = true;
-  bool _personalized = true;
   bool _saving = false;
   bool _loading = true;
   int? _userId;
@@ -32,34 +27,10 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   Future<void> _loadSettings() async {
     final id = await AuthService.instance.getUserId();
     if (!mounted) return;
-    if (id == null) {
-      setState(() {
-        _userId = null;
-        _loading = false;
-      });
-      return;
-    }
     setState(() {
       _userId = id;
-      _loading = true;
+      _loading = false;
     });
-    try {
-      final settings = await _service.fetch(id);
-      if (!mounted) return;
-      setState(() {
-        _twoFactor = settings.twoFactor;
-        _biometricLogin = settings.biometricLogin;
-        _rememberDevices = settings.trustedDevices;
-        _personalized = settings.personalizedRecommendations;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load settings: ${friendlyError(e)}')),
-      );
-    }
   }
 
   Future<int?> _requireUserId() async {
@@ -85,45 +56,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     }
     setState(() => _userId = id);
     return id;
-  }
-
-  Future<void> _updateSetting({
-    required String label,
-    required bool newValue,
-    required Future<PrivacySettings> Function(int userId) request,
-    required VoidCallback applyValue,
-    required VoidCallback revertValue,
-  }) async {
-    final userId = await _requireUserId();
-    if (userId == null) return;
-
-    setState(() {
-      _saving = true;
-      applyValue();
-    });
-    try {
-      final updated = await request(userId);
-      if (!mounted) return;
-      setState(() {
-        _twoFactor = updated.twoFactor;
-        _biometricLogin = updated.biometricLogin;
-        _rememberDevices = updated.trustedDevices;
-        _personalized = updated.personalizedRecommendations;
-        _saving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$label ${newValue ? 'enabled' : 'disabled'}')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        revertValue();
-        _saving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update $label: ${friendlyError(e)}')),
-      );
-    }
   }
 
   Future<void> _changePassword() async {
@@ -230,8 +162,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Privacy & Security'),
@@ -256,43 +186,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                   title: 'Security',
                   child: Column(
                     children: [
-                      SwitchListTile(
-                        value: _twoFactor,
-                        onChanged: _saving
-                            ? null
-                            : (value) {
-                                final previous = _twoFactor;
-                                _updateSetting(
-                                  label: 'Two-factor authentication',
-                                  newValue: value,
-                                  request: (id) => _service.update(id, twoFactor: value),
-                                  applyValue: () => _twoFactor = value,
-                                  revertValue: () => _twoFactor = previous,
-                                );
-                              },
-                        title: const Text('Two-factor authentication'),
-                        subtitle: const Text(
-                          'Adds an extra step when you login from a new device.',
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      SwitchListTile(
-                        value: _biometricLogin,
-                        onChanged: _saving
-                            ? null
-                            : (value) {
-                                final previous = _biometricLogin;
-                                _updateSetting(
-                                  label: 'Biometric login',
-                                  newValue: value,
-                                  request: (id) => _service.update(id, biometricLogin: value),
-                                  applyValue: () => _biometricLogin = value,
-                                  revertValue: () => _biometricLogin = previous,
-                                );
-                              },
-                        title: const Text('Biometric login'),
-                        subtitle: const Text('Use Face ID or fingerprint on supported devices.'),
-                      ),
                       ListTile(
                         title: const Text('Change password'),
                         subtitle: const Text('Update your account password.'),
@@ -304,65 +197,24 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                 ),
                 const SizedBox(height: 16),
                 _SectionCard(
-                  title: 'Privacy preferences',
+                  title: 'Privacy',
                   child: Column(
                     children: [
-                      SwitchListTile(
-                        value: _rememberDevices,
-                        onChanged: _saving
-                            ? null
-                            : (value) {
-                                final previous = _rememberDevices;
-                                _updateSetting(
-                                  label: 'Trusted devices',
-                                  newValue: value,
-                                  request: (id) => _service.update(id, trustedDevices: value),
-                                  applyValue: () => _rememberDevices = value,
-                                  revertValue: () => _rememberDevices = previous,
-                                );
-                              },
-                        title: const Text('Remember trusted devices'),
-                        subtitle: const Text('Skip verification on devices you frequently use.'),
-                      ),
-                      const Divider(height: 1),
-                      SwitchListTile(
-                        value: _personalized,
-                        onChanged: _saving
-                            ? null
-                            : (value) {
-                                final previous = _personalized;
-                                _updateSetting(
-                                  label: 'Personalized content',
-                                  newValue: value,
-                                  request: (id) => _service.update(
-                                      id, personalizedRecommendations: value),
-                                  applyValue: () => _personalized = value,
-                                  revertValue: () => _personalized = previous,
-                                );
-                              },
-                        title: const Text('Personalized recommendations'),
-                        subtitle: const Text(
-                          'Use your preferences to tailor offers and packages.',
-                        ),
-                      ),
                       ListTile(
                         title: const Text('Download my data'),
                         trailing: const Icon(Icons.file_download_outlined),
                         onTap: _saving ? null : _downloadData,
                       ),
+                      const Divider(height: 0),
+                      ListTile(
+                        title: const Text(
+                          'Delete account',
+                          style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                        ),
+                        trailing: const Icon(Icons.chevron_right, color: Colors.redAccent),
+                        onTap: _saving ? null : _deleteAccount,
+                      ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _SectionCard(
-                  title: 'Danger zone',
-                  child: ListTile(
-                    title: const Text(
-                      'Delete account',
-                      style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
-                    ),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.redAccent),
-                    onTap: _saving ? null : _deleteAccount,
                   ),
                 ),
               ],

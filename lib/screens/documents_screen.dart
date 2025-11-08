@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'document_viewer_screen.dart';
 
 import '../services/api_client.dart' show NoConnectionException;
 import '../services/auth_service.dart';
@@ -11,6 +11,7 @@ import '../services/dashboard_service.dart';
 import '../services/document_service.dart';
 import '../utils/error_utils.dart';
 import '../widgets/no_connection_view.dart';
+import 'help_support_screen.dart';
 
 class DocumentsScreen extends StatefulWidget {
   final int bookingId;
@@ -145,7 +146,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
     if (result == null || result.files.isEmpty) return null;
     final file = result.files.single;
-    if (file.size != null && file.size > 5 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('File exceeds 5MB limit.')), 
@@ -167,20 +168,31 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     return File(image.path);
   }
 
-  Future<void> _openDocument(String url) async {
+  Future<void> _openDocument(String url, {required String title}) async {
     if (url.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Document not available yet.')),
       );
       return;
     }
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open document.')),
+        const SnackBar(content: Text('Invalid document URL.')),
       );
+      return;
     }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DocumentViewerScreen(
+          url: uri.toString(),
+          title: title,
+        ),
+      ),
+    );
   }
 
   Widget _buildDocumentCard(Map<String, dynamic> doc) {
@@ -260,7 +272,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 const Spacer(),
                 if (hasFile)
                   TextButton.icon(
-                    onPressed: () => _openDocument(fileUrl),
+                    onPressed: () => _openDocument(
+                      fileUrl,
+                      title: fileName.isNotEmpty ? fileName : label,
+                    ),
                     icon: const Icon(Icons.open_in_new),
                     label: const Text('View'),
                   ),
@@ -368,7 +383,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: scheme.surfaceVariant.withOpacity(0.35),
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -382,7 +397,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   title: const Text('Need help?'),
                   subtitle: const Text('Contact our support team'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                    );
+                  },
                 ),
               ),
             ],
